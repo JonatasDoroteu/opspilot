@@ -22,12 +22,12 @@ async def list_incidents(status: str = "") -> str:
 
 
 @mcp.tool()
-async def create_incident(title: str, severity: str = "medium") -> str:
-    """Cria um novo incidente no OpsPilot."""
+async def create_incident(title: str, severity: str = "medium", category: str = "other") -> str:
+    """Cria um novo incidente no OpsPilot. Categorias comuns: database, deploy, network, other."""
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{API_URL}/incidents",
-            json={"title": title, "severity": severity},
+            json={"title": title, "severity": severity, "category": category},
             headers=_headers(),
         )
         return r.text
@@ -39,6 +39,27 @@ async def resolve_incident(incident_id: str) -> str:
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{API_URL}/incidents/{incident_id}/resolve", headers=_headers())
         return r.text
+
+
+@mcp.tool()
+async def get_runbook_for_incident(incident_id: str) -> str:
+    """Dado o ID de um incidente aberto, busca a categoria dele e retorna o runbook com os passos a seguir."""
+    async with httpx.AsyncClient() as client:
+        incidents_r = await client.get(f"{API_URL}/incidents", headers=_headers())
+        if incidents_r.status_code != 200:
+            return "Erro ao buscar incidentes."
+
+        incident = next((i for i in incidents_r.json() if i["id"] == incident_id), None)
+        if not incident:
+            return f"Incidente {incident_id} não encontrado."
+
+        category = incident["category"]
+        runbook_r = await client.get(f"{API_URL}/runbooks/{category}", headers=_headers())
+        if runbook_r.status_code == 404:
+            return f"Incidente é da categoria '{category}', mas não existe runbook cadastrado ainda."
+
+        rb = runbook_r.json()
+        return f"Runbook: {rb['title']}\n\n{rb['steps']}"
 
 
 if __name__ == "__main__":
