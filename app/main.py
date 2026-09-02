@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.observability import setup_logging, setup_sentry
-from app.routers import incidents
+from app.routers import incidents, runbooks
 from app.database import engine, Base
 
 setup_logging()
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="OpsPilot API", lifespan=lifespan)
 
 app.include_router(incidents.router)
+app.include_router(runbooks.router)
 Instrumentator().instrument(app).expose(app)
 
 
