@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 .env
+mcp_debug.log
+mcp_server/mcp_debug.log

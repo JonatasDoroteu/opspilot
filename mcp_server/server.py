@@ -1,6 +1,14 @@
 import os
+import logging
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_debug.log")
+logging.basicConfig(
+    filename=LOG_PATH,
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
+)
 
 API_URL = os.environ.get("OPSPILOT_API_URL", "http://localhost:8000")
 API_KEY = os.environ.get("OPSPILOT_API_KEY", "troque-essa-chave")
@@ -44,6 +52,7 @@ async def resolve_incident(incident_id: str) -> str:
 @mcp.tool()
 async def get_runbook_for_incident(incident_id: str) -> str:
     """Dado o ID de um incidente aberto, busca a categoria dele e retorna o runbook com os passos a seguir."""
+    logging.info(f"[MCP] get_runbook_for_incident chamado com incident_id={incident_id}")
     async with httpx.AsyncClient() as client:
         incidents_r = await client.get(f"{API_URL}/incidents", headers=_headers())
         if incidents_r.status_code != 200:
@@ -54,11 +63,13 @@ async def get_runbook_for_incident(incident_id: str) -> str:
             return f"Incidente {incident_id} não encontrado."
 
         category = incident["category"]
+        logging.info(f"[MCP] categoria identificada: {category} — buscando runbook...")
         runbook_r = await client.get(f"{API_URL}/runbooks/{category}", headers=_headers())
         if runbook_r.status_code == 404:
             return f"Incidente é da categoria '{category}', mas não existe runbook cadastrado ainda."
 
         rb = runbook_r.json()
+        logging.info(f"[MCP] runbook encontrado: {rb['title']}")
         return f"Runbook: {rb['title']}\n\n{rb['steps']}"
 
 
