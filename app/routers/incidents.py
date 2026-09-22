@@ -1,4 +1,5 @@
 import httpx
+import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,7 +50,7 @@ async def list_incidents(status: str | None = None, db: AsyncSession = Depends(g
 
 
 @router.post("/{incident_id}/resolve", response_model=IncidentOut, dependencies=[Depends(check_api_key)])
-async def resolve_incident(incident_id: str, db: AsyncSession = Depends(get_db)):
+async def resolve_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     incident = await db.get(Incident, incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incidente não encontrado")
