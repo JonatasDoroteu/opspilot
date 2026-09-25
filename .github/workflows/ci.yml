@@ -33,7 +33,7 @@ jobs:
           pip install pytest pytest-asyncio aiosqlite
 
       - name: Executar testes
-        run: pytest -q
+        run: python -m pytest -q
 
   compose-validation:
     name: Validar Docker Compose
