@@ -147,3 +147,18 @@ O agente busca a categoria do incidente e devolve o runbook certo automaticament
 - **API:** Railway ou Fly.io
 - **Banco:** Supabase (produção)
 - **n8n:** Railway tem template pronto de n8n, ou n8n Cloud (free tier)
+
+## CI/CD
+
+O GitHub Actions executa automaticamente em todo push e pull request direcionado à branch `main`.
+
+- **Testes Python:** configura Python 3.12, instala as dependências e roda a suíte completa com `pytest -q`, cobrindo os endpoints REST e as ferramentas MCP.
+- **Docker Compose:** valida o arquivo `docker-compose.yml` com `docker compose config` usando apenas valores placeholder.
+
+Para reproduzir o job de testes localmente:
+
+```bash
+pip install -r requirements.txt
+pip install pytest pytest-asyncio aiosqlite
+pytest -q
+```
