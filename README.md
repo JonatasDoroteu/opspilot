@@ -6,11 +6,11 @@ API de incidentes com Supabase, automação n8n, observabilidade e agente de IA 
 
 ![Fluxo ilustrado: API cria incidente, n8n Cloud recebe o webhook e Claude Desktop consulta o runbook via MCP](docs/demo.gif)
 
-*Animação ilustrativa do fluxo; a execução real depende da publicação da API e da configuração das contas Render, Supabase e n8n Cloud.*
+*Animação ilustrativa do fluxo. Em produção, API e banco (Render + Supabase) estão no ar; o webhook do n8n roda localmente até a configuração do n8n Cloud.*
 
 ## Testar em produção
 
-Abra [/docs](https://opspilot-yme6.onrender.com/docs) e use os endpoints GET livremente, sem chave. Os endpoints de escrita (POST/PATCH) exigem chave e ficam restritos ao dono do projeto.
+Abra [/docs](https://opspilot-yme6.onrender.com/docs) e teste `GET /incidents` e `GET /health` livremente, sem chave. `GET /runbooks/{category}` e os endpoints de escrita exigem chave e ficam restritos ao dono do projeto.
 
 > No plano gratuito do Render, o serviço hiberna; a primeira requisição após inatividade pode demorar cerca de um minuto.
 
