@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Incident
+from app.models import Incident, Runbook
 from app.routers import incidents
 from mcp_server import server as mcp_server
 
@@ -136,7 +136,29 @@ async def test_resolve_missing_incident_returns_404(client):
 
 
 @pytest.mark.asyncio
-async def test_invalid_runbook_category_returns_404(client):
+async def test_runbook_search_returns_matching_category(client, db_session):
+    db_session.add(
+        Runbook(
+            category="database",
+            title="Banco lento",
+            steps="Checar locks",
+            severity="high",
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get(
+        "/runbooks/database", headers={"x-api-key": TEST_API_KEY}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["category"] == "database"
+    assert response.json()["steps"] == "Checar locks"
+    assert response.json()["severity"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_runbook_search_returns_404_for_missing_category(client):
     response = await client.get(
         "/runbooks/not-a-category", headers={"x-api-key": TEST_API_KEY}
     )
@@ -224,11 +246,14 @@ async def test_mcp_get_runbook_for_incident_returns_runbook(mcp_transport):
         if request.url.path == "/incidents":
             return httpx.Response(200, json=[{"id": incident_id, "category": "database"}])
         assert request.url.path == "/runbooks/database"
-        return httpx.Response(200, json={"title": "Banco lento", "steps": "Checar locks"})
+        return httpx.Response(
+            200,
+            json={"title": "Banco lento", "steps": "Checar locks", "severity": "high"},
+        )
 
     mcp_transport(handler)
     result = await mcp_server.get_runbook_for_incident(incident_id)
-    assert result == "Runbook: Banco lento\n\nChecar locks"
+    assert result == "Runbook: Banco lento (severidade: high)\n\nChecar locks"
 
 
 @pytest.mark.asyncio
