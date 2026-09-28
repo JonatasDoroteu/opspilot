@@ -1,6 +1,12 @@
 # OpsPilot
 
+**Swagger:** [http://localhost:8000/docs](http://localhost:8000/docs) | Produção: pendente do domínio Railway.
+
 API de incidentes com Supabase, automação n8n, observabilidade e agente de IA via MCP. O diferencial: pergunte em linguagem natural pro Claude "o que fazer com esse incidente de banco travado?" e o agente MCP busca automaticamente o runbook certo, pela categoria do incidente.
+
+![Fluxo ilustrado: API cria incidente, n8n Cloud recebe o webhook e Claude Desktop consulta o runbook via MCP](docs/demo.gif)
+
+*Animação ilustrativa do fluxo; a execução real depende da publicação da API e da configuração das contas Railway, Supabase e n8n Cloud.*
 
 ## Passo 1 — Subir Postgres e n8n
 
@@ -70,13 +76,13 @@ Invoke-RestMethod -Uri "http://localhost:8000/incidents" -Method Post -Headers @
 3. Pega a connection string em **Project Settings → Database → Connection string** (modo "Transaction pooler")
 4. Troca `DATABASE_URL` no `.env` pela do Supabase (troca `postgresql://` por `postgresql+asyncpg://`)
 
-> ⚠️ `Base.metadata.create_all` (rodado no startup da API) cria tabelas novas, mas não adiciona colunas em tabelas já existentes. Se você alterar o schema depois de já ter rodado o projeto uma vez, rode a migração manualmente via SQL Editor do Supabase (ou psql local).
+> `Base.metadata.create_all` cria tabelas novas, mas não atualiza tabelas já existentes. Para atualizar um projeto anterior, execute `supabase/migrations/20260928_add_runbook_severity.sql` no SQL Editor do Supabase.
 
 ## Categorias e runbooks
 
 Cada incidente tem uma `category` (`database`, `deploy`, `network` ou `other`). A tabela `runbooks` guarda um playbook de passos por categoria — é isso que o agente MCP consulta.
 
-`GET /runbooks/{category}` — retorna o runbook daquela categoria (404 se não existir). Categorias sem runbook cadastrado caem em "sem runbook para essa categoria" quando o agente perguntar.
+`GET /runbooks/{category}` — retorna categoria, passos e severidade (404 se não existir). A ferramenta MCP `get_runbook_for_incident` busca o incidente e consulta esse endpoint, que lê a tabela `runbooks` no Supabase.
 
 | Categoria  | Runbook seed no `schema.sql`? |
 |------------|:------------------------------:|
@@ -85,7 +91,7 @@ Cada incidente tem uma `category` (`database`, `deploy`, `network` ou `other`). 
 | `network`  | ✅ |
 | `other`    | ❌ (adicionar manualmente) |
 
-Pra adicionar um novo runbook, insere direto na tabela `runbooks` (colunas: `category`, `title`, `steps`).
+Pra adicionar um novo runbook, insere direto na tabela `runbooks` (colunas: `category`, `title`, `steps`, `severity`).
 
 ## Passo 8 — Rodar o servidor MCP
 
@@ -142,11 +148,16 @@ Reinicia o Claude Desktop por completo (confere se não ficou processo residente
 
 O agente busca a categoria do incidente e devolve o runbook certo automaticamente.
 
-## Deploy (pra colocar no ar de verdade)
+## Deploy da API e n8n Cloud
 
-- **API:** Railway ou Fly.io
-- **Banco:** Supabase (produção)
-- **n8n:** Railway tem template pronto de n8n, ou n8n Cloud (free tier)
+1. Crie o projeto Supabase, execute `supabase/schema.sql` e aplique as migrações pendentes em `supabase/migrations/`.
+2. No Railway, crie um serviço a partir deste repositório e faça o deploy pelo `Dockerfile`.
+3. Configure no serviço da API as variáveis `DATABASE_URL` (URL do pooler Supabase usando `postgresql+asyncpg://`), `API_KEY` (segredo forte), `N8N_WEBHOOK_URL` (URL de produção do webhook n8n) e `ENVIRONMENT=production`.
+4. Gere um domínio público para o serviço Railway. A documentação ficará em `https://<dominio-gerado>/docs`; atualize o link do topo deste README com esse endereço.
+5. No n8n Cloud, crie um workflow com um nó **Webhook** (`POST`, path `incident-created`) e ative-o. Copie a **Production URL** do nó e defina-a como `N8N_WEBHOOK_URL` no Railway. O fluxo é API publicada → webhook do n8n Cloud.
+6. Valide `https://<dominio-gerado>/health` e crie um incidente de teste para confirmar a execução do workflow.
+
+O MCP do Claude Desktop deve usar o domínio público em `OPSPILOT_API_URL` e a mesma chave configurada em `API_KEY`. Nunca coloque segredos no repositório.
 
 ## CI/CD
 
