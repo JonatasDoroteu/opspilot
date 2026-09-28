@@ -70,7 +70,7 @@ async def get_runbook_for_incident(incident_id: str) -> str:
 
         rb = runbook_r.json()
         logging.info(f"[MCP] runbook encontrado: {rb['title']}")
-        return f"Runbook: {rb['title']}\n\n{rb['steps']}"
+        return f"Runbook: {rb['title']} (severidade: {rb['severity']})\n\n{rb['steps']}"
 
 
 if __name__ == "__main__":
