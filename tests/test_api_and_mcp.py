@@ -175,9 +175,7 @@ async def test_runbook_search_returns_matching_category(client, db_session):
     )
     await db_session.commit()
 
-    response = await client.get(
-        "/runbooks/database", headers={"x-api-key": TEST_API_KEY}
-    )
+    response = await client.get("/runbooks/database")
 
     assert response.status_code == 200
     assert response.json()["category"] == "database"
@@ -187,9 +185,7 @@ async def test_runbook_search_returns_matching_category(client, db_session):
 
 @pytest.mark.asyncio
 async def test_runbook_search_returns_404_for_missing_category(client):
-    response = await client.get(
-        "/runbooks/not-a-category", headers={"x-api-key": TEST_API_KEY}
-    )
+    response = await client.get("/runbooks/not-a-category")
     assert response.status_code == 404
 
 
