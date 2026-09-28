@@ -27,26 +27,36 @@ async def create_incident(payload: IncidentCreate, db: AsyncSession = Depends(ge
 
     log.info("incident_created", id=str(incident.id), severity=incident.severity)
 
-    async with httpx.AsyncClient() as client:
+    if settings.n8n_webhook_url:
         try:
-            await client.post(
-                settings.n8n_webhook_url,
-                json={"id": str(incident.id), "title": incident.title, "severity": incident.severity},
-                timeout=5,
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    settings.n8n_webhook_url,
+                    json={"id": str(incident.id), "title": incident.title, "severity": incident.severity},
+                    timeout=5,
+                )
+                response.raise_for_status()
         except httpx.HTTPError as e:
             log.warning("n8n_webhook_failed", error=str(e))
 
     return incident
 
 
-@router.get("", response_model=list[IncidentOut], dependencies=[Depends(check_api_key)])
+@router.get("", response_model=list[IncidentOut])
 async def list_incidents(status: str | None = None, db: AsyncSession = Depends(get_db)):
     query = select(Incident)
     if status:
         query = query.where(Incident.status == status)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.get("/{incident_id}", response_model=IncidentOut)
+async def get_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    incident = await db.get(Incident, incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incidente não encontrado")
+    return incident
 
 
 @router.post("/{incident_id}/resolve", response_model=IncidentOut, dependencies=[Depends(check_api_key)])

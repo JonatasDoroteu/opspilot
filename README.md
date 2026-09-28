@@ -1,12 +1,18 @@
 # OpsPilot
 
-**Swagger:** [http://localhost:8000/docs](http://localhost:8000/docs) | Produção: pendente do domínio Railway.
+**Swagger local:** [http://localhost:8000/docs](http://localhost:8000/docs) | **Produção:** [https://opspilot-yme6.onrender.com/docs](https://opspilot-yme6.onrender.com/docs).
 
 API de incidentes com Supabase, automação n8n, observabilidade e agente de IA via MCP. O diferencial: pergunte em linguagem natural pro Claude "o que fazer com esse incidente de banco travado?" e o agente MCP busca automaticamente o runbook certo, pela categoria do incidente.
 
 ![Fluxo ilustrado: API cria incidente, n8n Cloud recebe o webhook e Claude Desktop consulta o runbook via MCP](docs/demo.gif)
 
-*Animação ilustrativa do fluxo; a execução real depende da publicação da API e da configuração das contas Railway, Supabase e n8n Cloud.*
+*Animação ilustrativa do fluxo; a execução real depende da publicação da API e da configuração das contas Render, Supabase e n8n Cloud.*
+
+## Testar em produção
+
+Abra [/docs](https://opspilot-yme6.onrender.com/docs) e use os endpoints GET livremente, sem chave. Os endpoints de escrita (POST/PATCH) exigem chave e ficam restritos ao dono do projeto.
+
+> No plano gratuito do Render, o serviço hiberna; a primeira requisição após inatividade pode demorar cerca de um minuto.
 
 ## Passo 1 — Subir Postgres e n8n
 
@@ -151,10 +157,10 @@ O agente busca a categoria do incidente e devolve o runbook certo automaticament
 ## Deploy da API e n8n Cloud
 
 1. Crie o projeto Supabase, execute `supabase/schema.sql` e aplique as migrações pendentes em `supabase/migrations/`.
-2. No Railway, crie um serviço a partir deste repositório e faça o deploy pelo `Dockerfile`.
+2. No Render, crie um Web Service a partir deste repositório e faça o deploy pelo `Dockerfile`.
 3. Configure no serviço da API as variáveis `DATABASE_URL` (URL do pooler Supabase usando `postgresql+asyncpg://`), `API_KEY` (segredo forte), `N8N_WEBHOOK_URL` (URL de produção do webhook n8n) e `ENVIRONMENT=production`.
-4. Gere um domínio público para o serviço Railway. A documentação ficará em `https://<dominio-gerado>/docs`; atualize o link do topo deste README com esse endereço.
-5. No n8n Cloud, crie um workflow com um nó **Webhook** (`POST`, path `incident-created`) e ative-o. Copie a **Production URL** do nó e defina-a como `N8N_WEBHOOK_URL` no Railway. O fluxo é API publicada → webhook do n8n Cloud.
+4. Gere um domínio público para o serviço Render. A documentação ficará em `https://<dominio-gerado>/docs`.
+5. No n8n Cloud, crie um workflow com um nó **Webhook** (`POST`, path `incident-created`) e ative-o. Copie a **Production URL** do nó e defina-a como `N8N_WEBHOOK_URL` no Render. O fluxo é API publicada → webhook do n8n Cloud.
 6. Valide `https://<dominio-gerado>/health` e crie um incidente de teste para confirmar a execução do workflow.
 
 O MCP do Claude Desktop deve usar o domínio público em `OPSPILOT_API_URL` e a mesma chave configurada em `API_KEY`. Nunca coloque segredos no repositório.
@@ -163,7 +169,7 @@ O MCP do Claude Desktop deve usar o domínio público em `OPSPILOT_API_URL` e a 
 
 O GitHub Actions executa automaticamente em todo push e pull request direcionado à branch `main`.
 
-- **Testes Python:** configura Python 3.12, instala as dependências e roda a suíte completa com `pytest -q`, cobrindo os endpoints REST e as ferramentas MCP.
+- **Testes Python (16 testes):** configura Python 3.12, instala as dependências e roda a suíte completa com `pytest -q`, cobrindo os endpoints REST e as ferramentas MCP.
 - **Docker Compose:** valida o arquivo `docker-compose.yml` com `docker compose config` usando apenas valores placeholder.
 
 Para reproduzir o job de testes localmente:

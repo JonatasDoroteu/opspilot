@@ -17,6 +17,8 @@ TEST_API_KEY = "test-api-key"
 
 
 class FakeWebhookClient:
+    calls = 0
+
     async def __aenter__(self):
         return self
 
@@ -24,7 +26,8 @@ class FakeWebhookClient:
         return False
 
     async def post(self, *args, **kwargs):
-        return httpx.Response(200)
+        type(self).calls += 1
+        raise httpx.ConnectError("webhook indisponivel")
 
 
 @pytest_asyncio.fixture
@@ -47,7 +50,13 @@ async def client(db_session, monkeypatch):
 
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(incidents.settings, "api_key", TEST_API_KEY)
-    monkeypatch.setattr(incidents, "httpx", SimpleNamespace(AsyncClient=FakeWebhookClient))
+    monkeypatch.setattr(incidents.settings, "n8n_webhook_url", "https://webhook.test")
+    FakeWebhookClient.calls = 0
+    monkeypatch.setattr(
+        incidents,
+        "httpx",
+        SimpleNamespace(AsyncClient=FakeWebhookClient, HTTPError=httpx.HTTPError),
+    )
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
@@ -72,7 +81,7 @@ def mcp_transport(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_incident_returns_created_incident(client):
+async def test_create_incident_returns_created_incident(client, monkeypatch):
     response = await client.post(
         "/incidents",
         headers={"x-api-key": TEST_API_KEY},
@@ -81,10 +90,27 @@ async def test_create_incident_returns_created_incident(client):
     assert response.status_code == 200
     assert response.json()["title"] == "API indisponivel"
     assert response.json()["status"] == "open"
+    assert FakeWebhookClient.calls == 1
+
+    monkeypatch.setattr(incidents.settings, "n8n_webhook_url", "")
+    response = await client.post(
+        "/incidents",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Webhook opcional", "severity": "low", "category": "other"},
+    )
+    assert response.status_code == 200
+    assert FakeWebhookClient.calls == 1
 
 
 @pytest.mark.asyncio
 async def test_create_incident_rejects_malformed_payload(client):
+    unauthorized = await client.post(
+        "/incidents",
+        headers={"x-api-key": "invalid"},
+        json={"title": "Sem chave", "severity": "high", "category": "network"},
+    )
+    assert unauthorized.status_code == 401
+
     response = await client.post(
         "/incidents", headers={"x-api-key": TEST_API_KEY}, json={"severity": "high"}
     )
@@ -95,10 +121,14 @@ async def test_create_incident_rejects_malformed_payload(client):
 async def test_list_incidents_returns_incidents(client, db_session):
     db_session.add(Incident(title="Banco lento", category="database"))
     await db_session.commit()
-    response = await client.get("/incidents", headers={"x-api-key": TEST_API_KEY})
+    response = await client.get("/incidents")
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["title"] == "Banco lento"
+
+    detail = await client.get(f"/incidents/{response.json()[0]['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["title"] == "Banco lento"
 
 
 @pytest.mark.asyncio
@@ -107,9 +137,7 @@ async def test_list_incidents_filters_by_status(client, db_session):
         [Incident(title="Aberto", status="open"), Incident(title="Resolvido", status="resolved")]
     )
     await db_session.commit()
-    response = await client.get(
-        "/incidents?status=resolved", headers={"x-api-key": TEST_API_KEY}
-    )
+    response = await client.get("/incidents?status=resolved")
     assert response.status_code == 200
     assert [item["title"] for item in response.json()] == ["Resolvido"]
 
