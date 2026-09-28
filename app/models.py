@@ -11,7 +11,7 @@ class Incident(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(200))
-    severity: Mapped[str] = mapped_column(String(20), default="medium")
+    severity: Mapped[str] = mapped_column(String(20), default="medium", server_default="medium")
     status: Mapped[str] = mapped_column(String(20), default="open")
     source: Mapped[str] = mapped_column(String(100), default="manual")
     category: Mapped[str] = mapped_column(String(50), default="other")
@@ -26,4 +26,5 @@ class Runbook(Base):
     category: Mapped[str] = mapped_column(String(50), unique=True)
     title: Mapped[str] = mapped_column(String(200))
     steps: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(20), default="medium")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

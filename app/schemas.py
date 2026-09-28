@@ -29,6 +29,7 @@ class RunbookOut(BaseModel):
     category: str
     title: str
     steps: str
+    severity: str
     created_at: datetime
 
     class Config:
