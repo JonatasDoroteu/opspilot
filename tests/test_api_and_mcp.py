@@ -11,6 +11,7 @@ from app.database import Base, get_db
 from app.main import app
 from app.models import Incident, Runbook
 from app.routers import incidents
+from app.services.triage import TriageError, TriageResult
 from mcp_server import server as mcp_server
 
 TEST_API_KEY = "test-api-key"
@@ -103,6 +104,23 @@ async def test_create_incident_returns_created_incident(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_created_incident_appears_in_list_after_webhook_failure(client):
+    response = await client.post(
+        "/incidents",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Persistencia confirmada", "severity": "high", "category": "database"},
+    )
+    assert response.status_code == 200
+
+    incidents_response = await client.get("/incidents")
+    assert incidents_response.status_code == 200
+    assert any(
+        incident["id"] == response.json()["id"]
+        for incident in incidents_response.json()
+    )
+
+
+@pytest.mark.asyncio
 async def test_create_incident_rejects_malformed_payload(client):
     unauthorized = await client.post(
         "/incidents",
@@ -115,6 +133,96 @@ async def test_create_incident_rejects_malformed_payload(client):
         "/incidents", headers={"x-api-key": TEST_API_KEY}, json={"severity": "high"}
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_triage_incident_returns_suggestion_without_creating_incident(
+    client, monkeypatch
+):
+    async def fake_triage(title, description):
+        assert title == "Banco lento"
+        assert description == "Pool de conexões esgotado"
+        return TriageResult(
+            category="database",
+            severity="high",
+            reason="O pool de conexões está esgotado.",
+        )
+
+    monkeypatch.setattr(incidents.settings, "gemini_api_key", "mock-gemini-key")
+    monkeypatch.setattr(incidents, "triage_incident", fake_triage)
+
+    response = await client.post(
+        "/incidents/triage",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Banco lento", "description": "Pool de conexões esgotado"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "category": "database",
+        "severity": "high",
+        "reason": "O pool de conexões está esgotado.",
+    }
+    incidents_response = await client.get("/incidents")
+    assert incidents_response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_triage_incident_requires_api_key(client, monkeypatch):
+    async def unexpected_triage(*args):
+        pytest.fail("triage_incident não deveria ser chamada sem autenticação")
+
+    monkeypatch.setattr(incidents, "triage_incident", unexpected_triage)
+
+    response = await client.post("/incidents/triage", json={"title": "Sem chave"})
+
+    assert response.status_code == 422
+
+    response = await client.post(
+        "/incidents/triage",
+        headers={"x-api-key": "invalid"},
+        json={"title": "Chave inválida"},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_triage_incident_returns_503_without_gemini_api_key(
+    client, monkeypatch
+):
+    async def unexpected_triage(*args):
+        pytest.fail("triage_incident não deveria ser chamada sem GEMINI_API_KEY")
+
+    monkeypatch.setattr(incidents.settings, "gemini_api_key", "")
+    monkeypatch.setattr(incidents, "triage_incident", unexpected_triage)
+
+    response = await client.post(
+        "/incidents/triage",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Banco lento"},
+    )
+
+    assert response.status_code == 503
+    assert "GEMINI_API_KEY" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_triage_incident_translates_triage_error_to_502(client, monkeypatch):
+    async def failed_triage(*args):
+        raise TriageError("Gemini indisponível")
+
+    monkeypatch.setattr(incidents.settings, "gemini_api_key", "mock-gemini-key")
+    monkeypatch.setattr(incidents, "triage_incident", failed_triage)
+
+    response = await client.post(
+        "/incidents/triage",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Banco lento"},
+    )
+
+    assert response.status_code == 502
+    assert "Gemini indisponível" in response.json()["detail"]
 
 
 @pytest.mark.asyncio

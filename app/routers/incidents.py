@@ -2,6 +2,7 @@ import httpx
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -9,6 +10,7 @@ from app.models import Incident
 from app.schemas import IncidentCreate, IncidentOut
 from app.config import settings
 from app.observability import log
+from app.services.triage import TriageError, TriageResult, triage_incident
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -16,6 +18,11 @@ router = APIRouter(prefix="/incidents", tags=["incidents"])
 def check_api_key(x_api_key: str = Header(...)):
     if x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="API key inválida")
+
+
+class IncidentTriageRequest(BaseModel):
+    title: str
+    description: str | None = None
 
 
 @router.post("", response_model=IncidentOut, dependencies=[Depends(check_api_key)])
@@ -40,6 +47,26 @@ async def create_incident(payload: IncidentCreate, db: AsyncSession = Depends(ge
             log.warning("n8n_webhook_failed", error=str(e))
 
     return incident
+
+
+@router.post(
+    "/triage",
+    response_model=TriageResult,
+    dependencies=[Depends(check_api_key)],
+)
+async def triage_incident_endpoint(payload: IncidentTriageRequest):
+    if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Triagem indisponível: configure GEMINI_API_KEY.",
+        )
+    try:
+        return await triage_incident(payload.title, payload.description)
+    except TriageError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao gerar sugestão de triagem: {error}",
+        ) from error
 
 
 @router.get("", response_model=list[IncidentOut])
