@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     environment: str = "development"
     api_key: str
+    gemini_api_key: str = ""
+    gemini_model: str = ""
 
     class Config:
         env_file = ".env"
