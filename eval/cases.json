@@ -3,7 +3,7 @@
     "id": "case-01",
     "title": "Banco de produção indisponível",
     "description": "A aplicação não consegue abrir conexões com o banco; nenhum usuário consegue acessar o produto.",
-    "expected_category": "deploy",
+    "expected_category": "database",
     "expected_severity": "critical"
   },
   {
