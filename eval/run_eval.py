@@ -4,7 +4,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -50,7 +50,10 @@ def is_rate_limited(error: Exception) -> bool:
 
 
 async def evaluate_cases(
-    cases: list[dict[str, Any]], start_index: int, sleep_seconds: float
+    cases: list[dict[str, Any]],
+    start_index: int,
+    sleep_seconds: float,
+    save_progress: Callable[[list[dict[str, Any]]], None],
 ) -> list[dict[str, Any]]:
     results = []
     for index, case in enumerate(cases):
@@ -89,6 +92,7 @@ async def evaluate_cases(
                 "message": safe_error_message(error),
             }
         results.append(result)
+        save_progress(results)
         print(f"[{case_number}] {case['title']}: {result['status']}")
         if result["status"] == "rate_limited":
             print(
@@ -106,6 +110,23 @@ def accuracy(correct: int, evaluated: int) -> str:
         return "n/a (0 triagens válidas)"
     percentage = correct / evaluated * 100
     return f"{correct}/{evaluated} ({percentage:.1f}%)"
+
+
+def save_results(
+    output_path: Path,
+    metadata: dict[str, Any],
+    results: list[dict[str, Any]],
+    summary: dict[str, Any] | None = None,
+) -> None:
+    output_path.write_text(
+        json.dumps(
+            {**metadata, "summary": summary, "results": results},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def print_summary(
@@ -235,28 +256,26 @@ async def main() -> int:
         print("Nenhum caso selecionado; confira --start e --limit.", file=sys.stderr)
         return 2
 
-    results = await evaluate_cases(selected_cases, args.start, args.sleep)
-    summary = print_summary(results, len(selected_cases))
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = RESULTS_DIR / f"triage_eval_{timestamp}.json"
-    output_path.write_text(
-        json.dumps(
-            {
-                "timestamp_utc": timestamp,
-                "start": args.start,
-                "limit": args.limit,
-                "sleep_seconds": args.sleep,
-                "total_cases": len(all_cases),
-                "summary": summary,
-                "results": results,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    metadata = {
+        "timestamp_utc": timestamp,
+        "start": args.start,
+        "limit": args.limit,
+        "sleep_seconds": args.sleep,
+        "total_cases": len(all_cases),
+    }
+    results = await evaluate_cases(
+        selected_cases,
+        args.start,
+        args.sleep,
+        lambda current_results: save_results(
+            output_path, metadata, current_results
+        ),
     )
+    summary = print_summary(results, len(selected_cases))
+    save_results(output_path, metadata, results, summary)
     print(f"\nResultado salvo em: {output_path.relative_to(PROJECT_ROOT)}")
     return 1 if summary["failed"] else 0
 
