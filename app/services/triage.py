@@ -55,7 +55,7 @@ Descrição: {description or "Não informada"}"""
         client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
-                timeout=15_000,
+                timeout=30_000,
                 retry_options=types.HttpRetryOptions(
                     attempts=1,
                     http_status_codes=[429, *range(500, 600)],
@@ -63,9 +63,9 @@ Descrição: {description or "Não informada"}"""
             ),
         )
         async with client.aio as async_client:
-            for attempt in range(3):
+            for attempt in range(2):
                 try:
-                    async with asyncio.timeout(15):
+                    async with asyncio.timeout(30):
                         response = await async_client.models.generate_content(
                             model=model,
                             contents=prompt,
@@ -80,8 +80,8 @@ Descrição: {description or "Não informada"}"""
                     retryable = status_code == 429 or (
                         isinstance(status_code, int) and 500 <= status_code <= 599
                     )
-                    if retryable and attempt < 2:
-                        await asyncio.sleep(0.5 * (2**attempt))
+                    if retryable and attempt < 1:
+                        await asyncio.sleep(5)
                         continue
                     message = _safe_error_message(error, api_key)
                     raise TriageError(

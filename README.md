@@ -122,9 +122,9 @@ O endpoint só sugere: **não grava nada no banco**. Quem decide o que fazer com
 
 **Como funciona** (`app/services/triage.py`):
 
-- Chamada assíncrona ao Gemini com o SDK `google-genai`, com timeout de 15 segundos.
+- Chamada assíncrona ao Gemini com o SDK `google-genai`, com timeout de 30 segundos.
 - A resposta é validada com Pydantic. `category` e `severity` só aceitam valores fixos (`Literal`); JSON fora do formato levanta `TriageError`, sem valor padrão "chutado".
-- Até 3 tentativas, apenas em erros 429 e 5xx. Erros como chave inválida (401/403) não são repetidos.
+- Até 2 tentativas, com 5 segundos de espera entre elas, apenas em erros 429 e 5xx. Erros como chave inválida (401/403) não são repetidos.
 - Sem `GEMINI_API_KEY`, o erro é claro e acontece antes de chamar o SDK. A chave não aparece em logs nem em mensagens de erro.
 
 **Critério de severidade** usado no prompt:
