@@ -89,7 +89,7 @@ Descrição: {description or "Não informada"}"""
                     ) from error
                 except TimeoutError as error:
                     raise TriageError(
-                        "Tempo limite de 15 segundos excedido ao chamar o Gemini."
+                        "Tempo limite de 30 segundos excedido ao chamar o Gemini."
                     ) from error
     except TriageError:
         raise

@@ -148,8 +148,9 @@ Para saber se a triagem acerta, existe um conjunto pequeno de casos rotulados à
 - `eval/run_eval.py` roda os casos, mostra acerto de categoria e de severidade, lista os casos errados (esperado, obtido, motivo) e salva um JSON em `eval/resultados/`.
 
 ```bash
-python eval/run_eval.py --start 0 --limit 12 --sleep 15
-python eval/run_eval.py --start 12 --limit 12 --sleep 15
+python eval/run_eval.py --start 0 --limit 8 --sleep 15
+python eval/run_eval.py --start 8 --limit 8 --sleep 15
+python eval/run_eval.py --start 16 --limit 8 --sleep 15
 ```
 
 O plano gratuito do Gemini tem cota diária baixa, por isso o eval roda em lotes (`--start` e `--limit`). Se a cota acaba (429), o runner **para**, salva o resultado parcial e avisa em qual caso parou. O resumo sempre mostra "X de Y avaliados" e resultados parciais não devem ser usados como taxa de acerto.
