@@ -247,3 +247,86 @@ pip install -r requirements.txt
 pip install pytest pytest-asyncio aiosqlite
 pytest -q
 ```
+
+## Painel de incidentes (front-end)
+
+![Painel de incidentes](docs/painel-incidentes.png)
+
+<!-- Demo publicada: adicionar link -->
+
+O painel em `dashboard/` é uma interface somente leitura para consultar `GET /incidents` e `GET /runbooks/{category}`.
+
+### Funcionalidades
+
+- Lista incidentes com título, severidade, categoria, status e data de criação.
+- Exibe contadores por severidade que podem ser usados como filtro, além de filtros por status e categoria e a opção de limpar filtros.
+- Mostra o runbook da categoria do incidente selecionado ou informa quando não há runbook cadastrado para a categoria.
+- Apresenta estados de carregamento, erro e lista vazia. Se a API retornar erro, permite tentar novamente ou usar dados de exemplo.
+
+### Stack
+
+Versões declaradas em `dashboard/package.json`:
+
+- React e React DOM: `^19.3.1`
+- TypeScript: `~7.0.2`
+- Vite: `^8.3.5`
+- Sass: `^1.107.0`
+
+### Decisões técnicas
+
+- O painel faz somente requisições `GET`; não armazena nem envia API key.
+- O proxy de desenvolvimento do Vite encaminha `/incidents`, `/runbooks` e `/health` para a API local em `http://localhost:8000`, evitando uma chamada cross-origin do navegador sem exigir alteração no back-end.
+- As chamadas usam `fetch` com `AbortController` e timeout de 90 segundos.
+- O JSON recebido é validado com funções de checagem de tipo, sem `any` ou assertions `as`.
+- Os estados de carregamento, erro e sucesso são representados por uniões discriminadas em TypeScript.
+- O SASS usa variáveis, um map de cores de severidade percorrido com `@each`, um mixin de foco e parciais importados com `@use`.
+
+### Como rodar
+
+Em um terminal, siga os passos de configuração e inicialização da API descritos acima. A configuração atual do proxy espera que ela esteja disponível em `http://localhost:8000`.
+
+Em outro terminal, na raiz do repositório, instale as dependências do painel e inicie o Vite:
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+Para apontar o proxy a outro endereço da API, altere os valores `target` das rotas em `dashboard/vite.config.ts`.
+
+### Limitações conhecidas
+
+O campo `status` da resposta da API é uma string, sem valores restritos pelo schema do back-end. O painel aceita e exibe apenas `open` e `resolved`; se receber outro valor, a validação da resposta falha e a consulta de incidentes é apresentada como erro de formato inesperado.
+
+O painel ainda não está publicado.
+
+### Estrutura do dashboard
+
+```text
+dashboard/
+├── .gitignore
+├── .oxlintrc.json
+├── index.html
+├── README.md
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── public/
+│   └── favicon.svg
+└── src/
+    ├── App.tsx
+    ├── api.ts
+    ├── dadosDemo.ts
+    ├── main.tsx
+    ├── types.ts
+    ├── components/
+    │   ├── ListaIncidentes.tsx
+    │   └── PainelRunbook.tsx
+    └── styles/
+        ├── App.scss
+        └── _variaveis.scss
+```

@@ -1,0 +1,457 @@
+@use './variaveis' as *;
+
+:root {
+  color-scheme: light;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  color: $texto;
+  background: $fundo;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: $fundo;
+  color: $texto;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+#root {
+  display: block;
+  width: 100%;
+  max-width: 1100px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 28px 36px;
+  border: 0;
+  text-align: left;
+}
+
+.mono,
+.panel-count,
+.incident-id,
+.incident-date {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0 18px;
+  border-bottom: 1px solid $borda;
+
+  h1 {
+    margin: 0;
+    color: $texto;
+    font-size: clamp(1.25rem, 3vw, 1.65rem);
+    font-weight: 650;
+    letter-spacing: -0.035em;
+  }
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: $texto-secundario;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.source-badge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid $borda;
+  border-radius: 3px;
+  color: $texto-secundario;
+  font-size: 0.72rem;
+  font-weight: 650;
+
+  &.is-api {
+    border-color: $azul-marinho;
+    color: $azul-marinho;
+  }
+}
+
+.severity-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.severity-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid $borda;
+  border-top: 3px solid var(--severity-color);
+  border-radius: 3px;
+  background: $superficie;
+  cursor: pointer;
+  text-align: left;
+
+  @include foco-visivel;
+
+  &:hover,
+  &[aria-pressed='true'] {
+    border-color: $azul-marinho;
+    border-top-color: var(--severity-color);
+  }
+
+  .counter-label {
+    color: $texto-secundario;
+    font-size: 0.73rem;
+    font-weight: 650;
+    text-transform: uppercase;
+  }
+
+  .counter-value {
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+  }
+}
+
+@each $severity, $color in $cores-severidade {
+  .severity-#{$severity} {
+    --severity-color: #{$color};
+  }
+
+  .severity-text-#{$severity} {
+    color: $color;
+  }
+}
+
+.filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid $borda;
+  border-radius: 3px;
+  background: $superficie;
+}
+
+.filter-field {
+  display: grid;
+  gap: 5px;
+
+  label {
+    color: $texto-secundario;
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  select {
+    min-width: 150px;
+    padding: 7px 28px 7px 8px;
+    border: 1px solid $borda;
+    border-radius: 3px;
+    background: $superficie;
+    color: $texto;
+
+    @include foco-visivel;
+  }
+}
+
+.clear-button,
+.text-button {
+  padding: 7px 9px;
+  border: 1px solid $borda;
+  border-radius: 3px;
+  background: transparent;
+  color: $azul-marinho;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 650;
+
+  @include foco-visivel;
+
+  &:hover {
+    background: #f0f3f5;
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.incident-panel,
+.runbook-panel {
+  min-width: 0;
+  border: 1px solid $borda;
+  border-radius: 3px;
+  background: $superficie;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid $borda;
+
+  h2 {
+    margin: 0;
+    color: $texto;
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+  }
+}
+
+.panel-count {
+  color: $texto-secundario;
+  font-size: 0.9rem;
+}
+
+.incident-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li + li {
+    border-top: 1px solid $borda;
+  }
+}
+
+.incident-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px 12px 13px;
+  border: 0;
+  border-left: 4px solid var(--severity-color);
+  background: $superficie;
+  cursor: pointer;
+  text-align: left;
+
+  @include foco-visivel;
+
+  &:hover,
+  &.is-selected {
+    background: #f3f6f7;
+  }
+}
+
+.incident-row-main,
+.incident-row-side {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.incident-row-side {
+  flex: 0 0 auto;
+  justify-items: end;
+}
+
+.incident-title {
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 620;
+  text-overflow: ellipsis;
+}
+
+.incident-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: $texto-secundario;
+  font-size: 0.72rem;
+}
+
+.severity-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.incident-id,
+.incident-date {
+  color: $texto-secundario;
+  font-size: 0.7rem;
+}
+
+.severity-badge {
+  padding: 4px 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--severity-color);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.empty-state,
+.runbook-message {
+  margin: 0;
+  padding: 18px 16px;
+  color: $texto-secundario;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.runbook-error {
+  color: $critical;
+
+  .text-button {
+    margin-top: 12px;
+  }
+}
+
+.runbook-content {
+  padding: 16px;
+
+  h3 {
+    margin: 5px 0 14px;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+}
+
+.runbook-incident {
+  color: $texto-secundario;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.runbook-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid $borda;
+  border-bottom: 1px solid $borda;
+}
+
+.runbook-steps {
+  display: grid;
+  gap: 12px;
+  margin: 15px 0 0;
+  padding-left: 22px;
+
+  li {
+    padding-left: 3px;
+    color: $texto;
+    font-size: 0.84rem;
+    line-height: 1.5;
+  }
+
+  li::marker {
+    color: $azul-marinho;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-weight: 700;
+  }
+}
+
+.status-area {
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border: 1px solid $borda;
+  border-left: 4px solid $azul-marinho;
+  border-radius: 3px;
+  background: $superficie;
+  color: $texto-secundario;
+  font-size: 0.84rem;
+  line-height: 1.5;
+
+  p {
+    margin: 0;
+  }
+
+  .status-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 11px;
+  }
+}
+
+.status-error {
+  border-left-color: $critical;
+  color: $critical;
+}
+
+@media (max-width: 760px) {
+  #root {
+    padding: 0 16px 24px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  #root {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .severity-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-field select {
+    width: 100%;
+  }
+
+  .clear-button {
+    align-self: flex-start;
+  }
+
+  .incident-row {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .incident-row-side {
+    padding-top: 2px;
+  }
+}

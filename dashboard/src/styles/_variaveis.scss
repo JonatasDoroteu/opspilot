@@ -1,0 +1,23 @@
+$fundo: #eef1f3;
+$superficie: #ffffff;
+$texto: #202a32;
+$texto-secundario: #65717a;
+$borda: #d5dce0;
+$azul-marinho: #203b52;
+$critical: #8d2928;
+$high: #a64b22;
+$medium: #987218;
+$low: #647d72;
+$cores-severidade: (
+  critical: $critical,
+  high: $high,
+  medium: $medium,
+  low: $low,
+);
+
+@mixin foco-visivel {
+  &:focus-visible {
+    outline: 2px solid $azul-marinho;
+    outline-offset: 2px;
+  }
+}
