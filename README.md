@@ -2,6 +2,8 @@
 
 **Swagger local:** [http://localhost:8000/docs](http://localhost:8000/docs) | **Produção:** [https://opspilot-yme6.onrender.com/docs](https://opspilot-yme6.onrender.com/docs).
 
+**Painel:** [https://opspilot-phi.vercel.app](https://opspilot-phi.vercel.app)
+
 API de incidentes com Supabase, automação n8n, observabilidade, triagem com LLM (Gemini) e agente de IA via MCP. Dois usos de IA:
 
 - **Triagem:** dado o título e a descrição de um incidente, o Gemini sugere categoria e severidade (veja [Triagem com LLM](#triagem-com-llm)).
