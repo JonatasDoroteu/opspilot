@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models import Incident
-from app.schemas import IncidentCreate, IncidentOut
+from app.schemas import IncidentCreate, IncidentOut, IncidentStatus
 from app.config import settings
 from app.observability import log
 from app.services.triage import TriageError, TriageResult, triage_incident
@@ -70,7 +70,7 @@ async def triage_incident_endpoint(payload: IncidentTriageRequest):
 
 
 @router.get("", response_model=list[IncidentOut])
-async def list_incidents(status: str | None = None, db: AsyncSession = Depends(get_db)):
+async def list_incidents(status: IncidentStatus | None = None, db: AsyncSession = Depends(get_db)):
     query = select(Incident)
     if status:
         query = query.where(Incident.status == status)

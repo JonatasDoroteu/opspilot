@@ -1,6 +1,7 @@
 import os
 import logging
 import httpx
+from typing import Literal
 from mcp.server.fastmcp import FastMCP
 
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_debug.log")
@@ -21,9 +22,9 @@ def _headers():
 
 
 @mcp.tool()
-async def list_incidents(status: str = "") -> str:
+async def list_incidents(status: Literal["open", "resolved"] | None = None) -> str:
     """Lista incidentes do OpsPilot. Filtra por status (open/resolved) se informado."""
-    params = {"status": status} if status else {}
+    params = {"status": status} if status is not None else {}
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{API_URL}/incidents", params=params, headers=_headers())
         return r.text

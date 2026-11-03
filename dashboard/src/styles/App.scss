@@ -294,6 +294,13 @@ button {
   font-size: 0.72rem;
 }
 
+.incident-status-unknown {
+  padding: 1px 4px;
+  border: 1px solid $borda;
+  border-radius: 3px;
+  color: $texto-secundario;
+}
+
 .severity-label {
   font-size: 0.7rem;
   font-weight: 700;

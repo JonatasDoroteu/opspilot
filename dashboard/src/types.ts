@@ -6,7 +6,7 @@ export interface Incident {
   id: string
   title: string
   severity: Severity
-  status: IncidentStatus
+  status: string
   source: string
   category: Category
   created_at: string
