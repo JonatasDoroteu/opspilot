@@ -1,5 +1,6 @@
 import type { Category, Incident, IncidentStatus, Runbook, Severity } from './types'
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 const severities: readonly Severity[] = ['critical', 'high', 'medium', 'low']
 const categories: readonly Category[] = ['database', 'deploy', 'network', 'other']
 const statuses: readonly IncidentStatus[] = ['open', 'resolved']
@@ -57,7 +58,7 @@ async function buscarJson(path: string): Promise<Response> {
   const timeout = window.setTimeout(() => controller.abort(), 90_000)
 
   try {
-    // O caminho relativo permite usar o proxy local e a mesma origem em produção.
+    // Sem base configurada, mantém o proxy local do Vite.
     return await fetch(path, { signal: controller.signal })
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -82,7 +83,7 @@ async function lerJson(response: Response): Promise<unknown> {
 }
 
 export async function buscarIncidentes(): Promise<Incident[]> {
-  const response = await buscarJson('/incidents')
+  const response = await buscarJson(`${apiBaseUrl}/incidents`)
   if (!response.ok) {
     throw new Error(`A API respondeu com erro HTTP ${response.status} ao buscar incidentes.`)
   }
@@ -95,7 +96,7 @@ export async function buscarIncidentes(): Promise<Incident[]> {
 }
 
 export async function buscarRunbook(category: Category): Promise<Runbook | null> {
-  const response = await buscarJson(`/runbooks/${encodeURIComponent(category)}`)
+  const response = await buscarJson(`${apiBaseUrl}/runbooks/${encodeURIComponent(category)}`)
   if (response.status === 404) return null
   if (!response.ok) {
     throw new Error(`A API respondeu com erro HTTP ${response.status} ao buscar o runbook.`)

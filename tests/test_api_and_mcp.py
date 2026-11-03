@@ -7,6 +7,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app import main as main_module
 from app.database import Base, get_db
 from app.main import app
 from app.models import Incident, Runbook
@@ -64,6 +65,31 @@ async def client(db_session, monkeypatch):
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_configured_origin_only(monkeypatch):
+    allowed_origin = "https://dashboard.example"
+    monkeypatch.setattr(
+        main_module.settings,
+        "cors_origins",
+        " https://dashboard.example/ , https://other.example ",
+    )
+    cors_app = main_module.create_app()
+    transport = httpx.ASGITransport(app=cors_app)
+
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as test_client:
+        allowed_response = await test_client.get(
+            "/health", headers={"Origin": allowed_origin}
+        )
+        denied_response = await test_client.get(
+            "/health", headers={"Origin": "https://unlisted.example"}
+        )
+
+    assert allowed_response.headers["access-control-allow-origin"] == allowed_origin
+    assert "access-control-allow-origin" not in denied_response.headers
 
 
 @pytest.fixture
