@@ -1,9 +1,8 @@
-import type { Category, Incident, IncidentStatus, Runbook, Severity } from './types'
+import type { Category, Incident, Runbook, Severity } from './types'
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 const severities: readonly Severity[] = ['critical', 'high', 'medium', 'low']
 const categories: readonly Category[] = ['database', 'deploy', 'network', 'other']
-const statuses: readonly IncidentStatus[] = ['open', 'resolved']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -17,10 +16,6 @@ function isCategory(value: unknown): value is Category {
   return typeof value === 'string' && categories.some((category) => category === value)
 }
 
-function isIncidentStatus(value: unknown): value is IncidentStatus {
-  return typeof value === 'string' && statuses.some((status) => status === value)
-}
-
 function isDateString(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
@@ -32,7 +27,7 @@ function isIncident(value: unknown): value is Incident {
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     isSeverity(value.severity) &&
-    isIncidentStatus(value.status) &&
+    typeof value.status === 'string' &&
     typeof value.source === 'string' &&
     isCategory(value.category) &&
     isDateString(value.created_at) &&

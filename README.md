@@ -295,9 +295,7 @@ npm run dev
 
 Para apontar o proxy a outro endereço da API, altere os valores `target` das rotas em `dashboard/vite.config.ts`.
 
-### Limitações conhecidas
-
-O campo `status` da resposta da API é uma string, sem valores restritos pelo schema do back-end. O painel aceita e exibe apenas `open` e `resolved`; se receber outro valor, a validação da resposta falha e a consulta de incidentes é apresentada como erro de formato inesperado.
+O back-end restringe o status a `open` ou `resolved`; o painel mostra `Desconhecido` para valores inesperados.
 
 ## Deploy do painel
 

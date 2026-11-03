@@ -63,7 +63,19 @@ export function ListaIncidentes({
                       {nomesSeveridade[incidente.severity]}
                     </span>
                     <span>{nomesCategoria[incidente.category]}</span>
-                    <span>{incidente.status === 'open' ? 'Aberto' : 'Resolvido'}</span>
+                    <span
+                      className={
+                        incidente.status === 'open' || incidente.status === 'resolved'
+                          ? undefined
+                          : 'incident-status-unknown'
+                      }
+                    >
+                      {incidente.status === 'open'
+                        ? 'Aberto'
+                        : incidente.status === 'resolved'
+                          ? 'Resolvido'
+                          : 'Desconhecido'}
+                    </span>
                   </span>
                 </span>
                 <span className="incident-row-side">

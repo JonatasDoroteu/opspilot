@@ -162,6 +162,24 @@ async def test_create_incident_rejects_malformed_payload(client):
 
 
 @pytest.mark.asyncio
+async def test_create_incident_accepts_valid_status_and_rejects_invalid_status(client):
+    valid_response = await client.post(
+        "/incidents",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Incidente resolvido", "status": "resolved"},
+    )
+    assert valid_response.status_code == 200
+    assert valid_response.json()["status"] == "resolved"
+
+    invalid_response = await client.post(
+        "/incidents",
+        headers={"x-api-key": TEST_API_KEY},
+        json={"title": "Status inválido", "status": "pending"},
+    )
+    assert invalid_response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_triage_incident_returns_suggestion_without_creating_incident(
     client, monkeypatch
 ):
@@ -274,6 +292,9 @@ async def test_list_incidents_filters_by_status(client, db_session):
     response = await client.get("/incidents?status=resolved")
     assert response.status_code == 200
     assert [item["title"] for item in response.json()] == ["Resolvido"]
+
+    invalid_response = await client.get("/incidents?status=pending")
+    assert invalid_response.status_code == 422
 
 
 @pytest.mark.asyncio
