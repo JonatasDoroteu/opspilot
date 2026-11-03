@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     n8n_webhook_url: str = ""
     sentry_dsn: str = ""
     environment: str = "development"
+    cors_origins: str = ""
     api_key: str
     gemini_api_key: str = ""
     gemini_model: str = ""

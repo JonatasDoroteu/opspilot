@@ -299,7 +299,9 @@ Para apontar o proxy a outro endereço da API, altere os valores `target` das ro
 
 O campo `status` da resposta da API é uma string, sem valores restritos pelo schema do back-end. O painel aceita e exibe apenas `open` e `resolved`; se receber outro valor, a validação da resposta falha e a consulta de incidentes é apresentada como erro de formato inesperado.
 
-O painel ainda não está publicado.
+## Deploy do painel
+
+Publique `dashboard/` na Vercel com `VITE_API_URL=https://opspilot-yme6.onrender.com`. No Render, configure `CORS_ORIGINS` com a URL do painel, sem barra final. Painel: `https://<url-do-painel>`.
 
 ### Estrutura do dashboard
 

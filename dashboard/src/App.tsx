@@ -46,6 +46,7 @@ const nomesSeveridade: Record<Severity, string> = {
 
 function App() {
   const [estado, setEstado] = useState<EstadoIncidentes>({ status: 'loading' })
+  const [apiDemorando, setApiDemorando] = useState(false)
   const [origem, setOrigem] = useState<OrigemDados>('api')
   const [severityFilter, setSeverityFilter] = useState<Severity | ''>('')
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>('')
@@ -59,6 +60,7 @@ function App() {
     let ativo = true
 
     async function carregar(): Promise<void> {
+      setApiDemorando(false)
       setEstado({ status: 'loading' })
       setOrigem('api')
       try {
@@ -82,6 +84,13 @@ function App() {
       ativo = false
     }
   }, [tentativa])
+
+  useEffect(() => {
+    if (estado.status !== 'loading') return
+
+    const timeout = window.setTimeout(() => setApiDemorando(true), 5_000)
+    return () => window.clearTimeout(timeout)
+  }, [estado.status, tentativa])
 
   const incidentes = estado.status === 'ok' ? estado.incidentes : INCIDENTES_VAZIOS
   const incidentesOrdenados = useMemo(
@@ -265,7 +274,11 @@ function App() {
           aria-live="polite"
         >
           {estado.status === 'loading' ? (
-            <p>Conectando à API. No plano gratuito do Render, a primeira carga pode levar cerca de 1 minuto.</p>
+            <p>
+              {apiDemorando
+                ? 'A API gratuita pode estar acordando, isso leva até 1 minuto.'
+                : 'Conectando à API.'}
+            </p>
           ) : (
             <>
               <p>{estado.mensagem}</p>
