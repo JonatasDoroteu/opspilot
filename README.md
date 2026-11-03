@@ -293,6 +293,8 @@ npm install
 npm run dev
 ```
 
+Rode os testes do painel com `npm test` dentro de `dashboard/`. O CI também executa lint, type-check, testes e build do painel.
+
 Para apontar o proxy a outro endereço da API, altere os valores `target` das rotas em `dashboard/vite.config.ts`.
 
 O back-end restringe o status a `open` ou `resolved`; o painel mostra `Desconhecido` para valores inesperados.

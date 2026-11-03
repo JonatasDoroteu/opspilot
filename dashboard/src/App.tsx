@@ -3,6 +3,7 @@ import { buscarIncidentes, buscarRunbook } from './api'
 import { incidentesDemo, runbooksDemo } from './dadosDemo'
 import { ListaIncidentes } from './components/ListaIncidentes'
 import { PainelRunbook } from './components/PainelRunbook'
+import { filtrarIncidentes } from './filtrarIncidentes'
 import type { Category, Incident, IncidentStatus, Runbook, Severity } from './types'
 import './styles/App.scss'
 
@@ -108,12 +109,11 @@ function App() {
       ),
     [incidentes],
   )
-  const incidentesFiltrados = incidentesOrdenados.filter(
-    (incidente) =>
-      (!severityFilter || incidente.severity === severityFilter) &&
-      (!statusFilter || incidente.status === statusFilter) &&
-      (!categoryFilter || incidente.category === categoryFilter),
-  )
+  const incidentesFiltrados = filtrarIncidentes(incidentesOrdenados, {
+    severity: severityFilter,
+    status: statusFilter,
+    category: categoryFilter,
+  })
   const incidenteSelecionado =
     incidentesFiltrados.find((incidente) => incidente.id === incidenteSelecionadoId) ??
     incidentesFiltrados[0] ??
