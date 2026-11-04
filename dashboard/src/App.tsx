@@ -52,6 +52,7 @@ function App() {
   const [severityFilter, setSeverityFilter] = useState<Severity | ''>('')
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>('')
   const [categoryFilter, setCategoryFilter] = useState<Category | ''>('')
+  const [searchFilter, setSearchFilter] = useState('')
   const [incidenteSelecionadoId, setIncidenteSelecionadoId] = useState<string | null>(null)
   const [resultadoRunbook, setResultadoRunbook] = useState<ResultadoRunbook | null>(null)
   const [tentativa, setTentativa] = useState(0)
@@ -113,6 +114,7 @@ function App() {
     severity: severityFilter,
     status: statusFilter,
     category: categoryFilter,
+    search: searchFilter,
   })
   const incidenteSelecionado =
     incidentesFiltrados.find((incidente) => incidente.id === incidenteSelecionadoId) ??
@@ -176,12 +178,14 @@ function App() {
     setSeverityFilter('')
     setStatusFilter('')
     setCategoryFilter('')
+    setSearchFilter('')
   }
 
   function limparFiltros(): void {
     setSeverityFilter('')
     setStatusFilter('')
     setCategoryFilter('')
+    setSearchFilter('')
   }
 
   function tentarNovamente(): void {
@@ -215,6 +219,16 @@ function App() {
       {estado.status === 'ok' && (
         <>
           <section className="filters" aria-label="Filtros de incidentes">
+            <div className="filter-field filter-field--search">
+              <label htmlFor="filtro-busca">Buscar</label>
+              <input
+                id="filtro-busca"
+                type="search"
+                placeholder="Buscar por título"
+                value={searchFilter}
+                onChange={(event) => setSearchFilter(event.target.value)}
+              />
+            </div>
             <div className="filter-field">
               <label htmlFor="filtro-status">Status</label>
               <select
@@ -270,8 +284,8 @@ function App() {
       {estado.status !== 'ok' && (
         <section
           className={`status-area${estado.status === 'error' ? ' status-error' : ''}`}
-          role="status"
-          aria-live="polite"
+          role={estado.status === 'error' ? 'alert' : 'status'}
+          aria-live={estado.status === 'error' ? 'assertive' : 'polite'}
         >
           {estado.status === 'loading' ? (
             <p>

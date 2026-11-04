@@ -42,9 +42,9 @@ export function PainelRunbook({
       {!incidente ? (
         <p className="empty-state">Selecione um incidente para consultar o procedimento.</p>
       ) : estado.status === 'loading' ? (
-        <p className="runbook-message" role="status">Carregando runbook…</p>
+        <p className="runbook-message" role="status" aria-live="polite">Carregando runbook…</p>
       ) : estado.status === 'error' ? (
-        <div className="runbook-message runbook-error" role="status">
+        <div className="runbook-message runbook-error" role="alert" aria-live="assertive">
           <p>{estado.mensagem}</p>
           <button type="button" className="text-button" onClick={onTentarNovamente}>
             Tentar novamente

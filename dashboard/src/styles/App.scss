@@ -24,7 +24,8 @@ body {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
@@ -169,7 +170,8 @@ button {
     text-transform: uppercase;
   }
 
-  select {
+  select,
+  input {
     min-width: 150px;
     padding: 7px 28px 7px 8px;
     border: 1px solid $borda;
@@ -179,6 +181,14 @@ button {
 
     @include foco-visivel;
   }
+}
+
+.filter-field--search {
+  flex: 1;
+}
+
+.filter-field input {
+  min-width: 220px;
 }
 
 .clear-button,
@@ -413,9 +423,30 @@ button {
   color: $critical;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767.98px) {
   #root {
     padding: 0 16px 24px;
+  }
+
+  .severity-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-field select,
+  .filter-field input,
+  .filters .clear-button {
+    width: 100%;
+  }
+
+  .filter-field select,
+  .filter-field input {
+    min-width: 0;
   }
 
   .dashboard-grid {
@@ -435,22 +466,8 @@ button {
     gap: 10px;
   }
 
-  .severity-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .filters {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .filter-field select {
-    width: 100%;
-  }
-
-  .clear-button {
-    align-self: flex-start;
+  .status-area .status-actions {
+    flex-wrap: wrap;
   }
 
   .incident-row {

@@ -5,7 +5,7 @@ import type { Incident } from './types'
 const incidentes: Incident[] = [
   {
     id: 'open-db',
-    title: 'Aberto banco',
+    title: 'Banco crítico lento',
     severity: 'high',
     status: 'open',
     source: 'monitoramento',
@@ -38,17 +38,17 @@ const incidentes: Incident[] = [
 describe('filtrarIncidentes', () => {
   it('filtra por status e mantém status inesperado apenas sem filtro de status', () => {
     expect(
-      filtrarIncidentes(incidentes, { status: '', category: '', severity: '' }).map(
+      filtrarIncidentes(incidentes, { status: '', category: '', severity: '', search: '' }).map(
         (incidente) => incidente.id,
       ),
     ).toEqual(['open-db', 'resolved-deploy', 'unknown-network'])
     expect(
-      filtrarIncidentes(incidentes, { status: 'open', category: '', severity: '' }).map(
+      filtrarIncidentes(incidentes, { status: 'open', category: '', severity: '', search: '' }).map(
         (incidente) => incidente.id,
       ),
     ).toEqual(['open-db'])
     expect(
-      filtrarIncidentes(incidentes, { status: 'resolved', category: '', severity: '' }).map(
+      filtrarIncidentes(incidentes, { status: 'resolved', category: '', severity: '', search: '' }).map(
         (incidente) => incidente.id,
       ),
     ).toEqual(['resolved-deploy'])
@@ -56,12 +56,12 @@ describe('filtrarIncidentes', () => {
 
   it('filtra por categoria e severidade', () => {
     expect(
-      filtrarIncidentes(incidentes, { status: '', category: 'network', severity: '' }).map(
+      filtrarIncidentes(incidentes, { status: '', category: 'network', severity: '', search: '' }).map(
         (incidente) => incidente.id,
       ),
     ).toEqual(['unknown-network'])
     expect(
-      filtrarIncidentes(incidentes, { status: '', category: '', severity: 'low' }).map(
+      filtrarIncidentes(incidentes, { status: '', category: '', severity: 'low', search: '' }).map(
         (incidente) => incidente.id,
       ),
     ).toEqual(['resolved-deploy'])
@@ -73,7 +73,38 @@ describe('filtrarIncidentes', () => {
         status: 'open',
         category: 'database',
         severity: 'high',
+        search: '',
       }).map((incidente) => incidente.id),
     ).toEqual(['open-db'])
+  })
+
+  it('busca no título sem diferenciar caixa ou acentos', () => {
+    expect(
+      filtrarIncidentes(incidentes, {
+        status: '',
+        category: '',
+        severity: '',
+        search: 'CRITICO',
+      }).map((incidente) => incidente.id),
+    ).toEqual(['open-db'])
+  })
+
+  it('combina a busca com os demais filtros e retorna vazio sem correspondência', () => {
+    expect(
+      filtrarIncidentes(incidentes, {
+        status: 'open',
+        category: 'database',
+        severity: 'high',
+        search: 'critico',
+      }).map((incidente) => incidente.id),
+    ).toEqual(['open-db'])
+    expect(
+      filtrarIncidentes(incidentes, {
+        status: '',
+        category: '',
+        severity: '',
+        search: 'não existe',
+      }),
+    ).toEqual([])
   })
 })
