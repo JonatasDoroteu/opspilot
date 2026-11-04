@@ -1,4 +1,5 @@
 import type { Incident, Severity } from '../types'
+import { formatarDataRelativa } from '../dataRelativa'
 
 interface ListaIncidentesProps {
   incidentes: Incident[]
@@ -20,10 +21,11 @@ const nomesCategoria: Record<Incident['category'], string> = {
   other: 'Outro',
 }
 
-function formatarData(data: string): string {
+function formatarDataCompleta(data: string): string {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
-    month: 'short',
+    month: 'long',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(data))
@@ -59,16 +61,20 @@ export function ListaIncidentes({
                 <span className="incident-row-main">
                   <span className="incident-title">{incidente.title}</span>
                   <span className="incident-meta">
-                    <span className={`severity-label severity-text-${incidente.severity}`}>
+                    <span
+                      className={`severity-label severity-badge severity-${incidente.severity}`}
+                    >
                       {nomesSeveridade[incidente.severity]}
                     </span>
                     <span>{nomesCategoria[incidente.category]}</span>
                     <span
-                      className={
-                        incidente.status === 'open' || incidente.status === 'resolved'
-                          ? undefined
-                          : 'incident-status-unknown'
-                      }
+                      className={`incident-status ${
+                        incidente.status === 'open'
+                          ? 'incident-status--open'
+                          : incidente.status === 'resolved'
+                            ? 'incident-status--resolved'
+                            : 'incident-status--unknown'
+                      }`}
                     >
                       {incidente.status === 'open'
                         ? 'Aberto'
@@ -80,8 +86,12 @@ export function ListaIncidentes({
                 </span>
                 <span className="incident-row-side">
                   <span className="incident-id">{incidente.id.slice(0, 8)}</span>
-                  <time className="incident-date" dateTime={incidente.created_at}>
-                    {formatarData(incidente.created_at)}
+                  <time
+                    className="incident-date"
+                    dateTime={incidente.created_at}
+                    title={formatarDataCompleta(incidente.created_at)}
+                  >
+                    {formatarDataRelativa(incidente.created_at, new Date())}
                   </time>
                 </span>
               </button>
