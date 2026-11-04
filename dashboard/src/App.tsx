@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buscarIncidentes, buscarRunbook } from './api'
 import { incidentesDemo, runbooksDemo } from './dadosDemo'
 import { ListaIncidentes } from './components/ListaIncidentes'
 import { PainelRunbook } from './components/PainelRunbook'
+import { formatarDataRelativa } from './dataRelativa'
 import { filtrarIncidentes } from './filtrarIncidentes'
+import { ordenarIncidentes } from './ordenarIncidentes'
+import type { OrdenacaoIncidentes } from './ordenarIncidentes'
 import type { Category, Incident, IncidentStatus, Runbook, Severity } from './types'
 import './styles/App.scss'
 
@@ -26,6 +29,11 @@ type OrigemDados = 'api' | 'demo'
 
 const INCIDENTES_VAZIOS: Incident[] = []
 const severidades: Severity[] = ['critical', 'high', 'medium', 'low']
+const ordenacoes: { value: OrdenacaoIncidentes; label: string }[] = [
+  { value: 'recentes', label: 'Mais recentes' },
+  { value: 'antigos', label: 'Mais antigos' },
+  { value: 'severidade', label: 'Severidade (crítica primeiro)' },
+]
 const categorias: { value: Category | ''; label: string }[] = [
   { value: '', label: 'Todas as categorias' },
   { value: 'database', label: 'Banco de dados' },
@@ -45,31 +53,72 @@ const nomesSeveridade: Record<Severity, string> = {
   low: 'Baixa',
 }
 
+function parametrosIniciais(): URLSearchParams {
+  return new URLSearchParams(window.location.search)
+}
+
+function isOrdenacao(value: string | null): value is OrdenacaoIncidentes {
+  return ordenacoes.some((ordenacao) => ordenacao.value === value)
+}
+
+function lerOrdenacaoInicial(): OrdenacaoIncidentes {
+  const value = parametrosIniciais().get('sort')
+  return isOrdenacao(value) ? value : 'recentes'
+}
+
+function lerStatusInicial(): IncidentStatus | '' {
+  const value = parametrosIniciais().get('status')
+  return statuses.find((status) => status.value === value)?.value ?? ''
+}
+
+function lerCategoriaInicial(): Category | '' {
+  const value = parametrosIniciais().get('category')
+  return categorias.find((categoria) => categoria.value === value)?.value ?? ''
+}
+
+function lerSeveridadeInicial(): Severity | '' {
+  const value = parametrosIniciais().get('severity')
+  return severidades.find((severity) => severity === value) ?? ''
+}
+
 function App() {
   const [estado, setEstado] = useState<EstadoIncidentes>({ status: 'loading' })
   const [apiDemorando, setApiDemorando] = useState(false)
   const [origem, setOrigem] = useState<OrigemDados>('api')
-  const [severityFilter, setSeverityFilter] = useState<Severity | ''>('')
-  const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>('')
-  const [categoryFilter, setCategoryFilter] = useState<Category | ''>('')
-  const [searchFilter, setSearchFilter] = useState('')
-  const [incidenteSelecionadoId, setIncidenteSelecionadoId] = useState<string | null>(null)
+  const [severityFilter, setSeverityFilter] = useState<Severity | ''>(lerSeveridadeInicial)
+  const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>(lerStatusInicial)
+  const [categoryFilter, setCategoryFilter] = useState<Category | ''>(lerCategoriaInicial)
+  const [searchFilter, setSearchFilter] = useState(() => parametrosIniciais().get('q') ?? '')
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoIncidentes>(lerOrdenacaoInicial)
+  const [incidenteSelecionadoId, setIncidenteSelecionadoId] = useState<string | null>(
+    () => parametrosIniciais().get('incident') || null,
+  )
+  const [selecaoVazia, setSelecaoVazia] = useState(
+    () => parametrosIniciais().has('incident') && parametrosIniciais().get('incident') === '',
+  )
   const [resultadoRunbook, setResultadoRunbook] = useState<ResultadoRunbook | null>(null)
   const [tentativa, setTentativa] = useState(0)
   const [tentativaRunbook, setTentativaRunbook] = useState(0)
+  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null)
+  const [agora, setAgora] = useState(() => new Date())
+  const campoBuscaRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let ativo = true
+    const controller = new AbortController()
 
     async function carregar(): Promise<void> {
       setApiDemorando(false)
       setEstado({ status: 'loading' })
       setOrigem('api')
       try {
-        const incidentes = await buscarIncidentes()
+        const incidentes = await buscarIncidentes(controller.signal)
         if (ativo) {
           setEstado({ status: 'ok', incidentes })
-          setIncidenteSelecionadoId(incidentes[0]?.id ?? null)
+          setAtualizadoEm(new Date().toISOString())
+          setIncidenteSelecionadoId((idAtual) =>
+            idAtual && incidentes.some((incidente) => incidente.id === idAtual) ? idAtual : null,
+          )
         }
       } catch (error: unknown) {
         if (ativo) {
@@ -84,8 +133,14 @@ function App() {
     void carregar()
     return () => {
       ativo = false
+      controller.abort()
     }
   }, [tentativa])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setAgora(new Date()), 30_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     if (estado.status !== 'loading') return
@@ -95,10 +150,6 @@ function App() {
   }, [estado.status, tentativa])
 
   const incidentes = estado.status === 'ok' ? estado.incidentes : INCIDENTES_VAZIOS
-  const incidentesOrdenados = useMemo(
-    () => [...incidentes].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
-    [incidentes],
-  )
   const contagens = useMemo(
     () =>
       severidades.reduce<Record<Severity, number>>(
@@ -110,38 +161,47 @@ function App() {
       ),
     [incidentes],
   )
-  const incidentesFiltrados = filtrarIncidentes(incidentesOrdenados, {
-    severity: severityFilter,
-    status: statusFilter,
-    category: categoryFilter,
-    search: searchFilter,
-  })
-  const incidenteSelecionado =
-    incidentesFiltrados.find((incidente) => incidente.id === incidenteSelecionadoId) ??
-    incidentesFiltrados[0] ??
-    null
+  const incidentesFiltrados = useMemo(
+    () =>
+      ordenarIncidentes(
+        filtrarIncidentes(incidentes, {
+          severity: severityFilter,
+          status: statusFilter,
+          category: categoryFilter,
+          search: searchFilter,
+        }),
+        ordenacao,
+      ),
+    [incidentes, severityFilter, statusFilter, categoryFilter, searchFilter, ordenacao],
+  )
+  const incidenteSelecionado = selecaoVazia
+    ? null
+    : incidentesFiltrados.find((incidente) => incidente.id === incidenteSelecionadoId) ??
+      incidentesFiltrados[0] ??
+      null
   const categoriaSelecionada = incidenteSelecionado?.category
   const chaveRunbook = categoriaSelecionada
     ? `${origem}:${categoriaSelecionada}:${tentativaRunbook}`
     : ''
 
   useEffect(() => {
-    if (!categoriaSelecionada || origem !== 'api') return
+    if (categoriaSelecionada === undefined || origem !== 'api') return
+    const category = categoriaSelecionada
     let ativo = true
 
     async function carregarRunbook(): Promise<void> {
       try {
-        const runbook = await buscarRunbook(categoriaSelecionada)
+        const runbook = await buscarRunbook(category)
         if (ativo) {
           setResultadoRunbook({
-            chave: `${origem}:${categoriaSelecionada}:${tentativaRunbook}`,
+            chave: `${origem}:${category}:${tentativaRunbook}`,
             estado: { status: 'ok', runbook },
           })
         }
       } catch (error: unknown) {
         if (ativo) {
           setResultadoRunbook({
-            chave: `${origem}:${categoriaSelecionada}:${tentativaRunbook}`,
+            chave: `${origem}:${category}:${tentativaRunbook}`,
             estado: {
               status: 'error',
               mensagem: error instanceof Error ? error.message : 'Erro inesperado ao carregar o runbook.',
@@ -156,6 +216,99 @@ function App() {
       ativo = false
     }
   }, [categoriaSelecionada, origem, tentativaRunbook])
+
+  useEffect(() => {
+    if (estado.status !== 'ok') return
+
+    const params = new URLSearchParams()
+    if (searchFilter) params.set('q', searchFilter)
+    if (statusFilter) params.set('status', statusFilter)
+    if (categoryFilter) params.set('category', categoryFilter)
+    if (severityFilter) params.set('severity', severityFilter)
+    if (ordenacao !== 'recentes') params.set('sort', ordenacao)
+    if (selecaoVazia) {
+      params.set('incident', '')
+    } else if (incidenteSelecionadoId) {
+      const idVisivel = incidentesFiltrados.some(
+        (incidente) => incidente.id === incidenteSelecionadoId,
+      )
+        ? incidenteSelecionadoId
+        : incidenteSelecionado?.id
+      if (idVisivel) params.set('incident', idVisivel)
+    }
+
+    const query = params.toString()
+    const url = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+    window.history.replaceState(null, '', url)
+  }, [
+    searchFilter,
+    statusFilter,
+    categoryFilter,
+    severityFilter,
+    ordenacao,
+    incidenteSelecionadoId,
+    incidenteSelecionado,
+    incidentesFiltrados,
+    selecaoVazia,
+    estado.status,
+  ])
+
+  useEffect(() => {
+    function lidarComTeclado(event: KeyboardEvent): void {
+      const alvo = event.target
+      const campoEditavel =
+        alvo instanceof HTMLInputElement ||
+        alvo instanceof HTMLTextAreaElement ||
+        alvo instanceof HTMLSelectElement ||
+        (alvo instanceof HTMLElement && alvo.isContentEditable)
+
+      if (event.key === '/' && !campoEditavel) {
+        event.preventDefault()
+        campoBuscaRef.current?.focus()
+        return
+      }
+
+      if (campoEditavel) return
+
+      if (event.key === 'Escape') {
+        setIncidenteSelecionadoId(null)
+        setSelecaoVazia(true)
+        return
+      }
+
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+      if (incidentesFiltrados.length === 0) return
+
+      event.preventDefault()
+      const indiceAtual = incidentesFiltrados.findIndex(
+        (incidente) => incidente.id === incidenteSelecionado?.id,
+      )
+      const proximoIndice =
+        indiceAtual < 0
+          ? event.key === 'ArrowDown'
+            ? 0
+            : incidentesFiltrados.length - 1
+          : Math.min(
+              Math.max(indiceAtual + (event.key === 'ArrowDown' ? 1 : -1), 0),
+              incidentesFiltrados.length - 1,
+            )
+      setIncidenteSelecionadoId(incidentesFiltrados[proximoIndice].id)
+      setSelecaoVazia(false)
+    }
+
+    window.addEventListener('keydown', lidarComTeclado)
+    return () => window.removeEventListener('keydown', lidarComTeclado)
+  }, [incidentesFiltrados, incidenteSelecionado])
+
+  useEffect(() => {
+    if (!incidenteSelecionado || selecaoVazia) return
+    const itemSelecionado = document.querySelector('.incident-row[aria-pressed="true"]')
+    if (!itemSelecionado || typeof itemSelecionado.scrollIntoView !== 'function') return
+    itemSelecionado.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'nearest',
+    })
+  }, [incidenteSelecionado, incidentesFiltrados, selecaoVazia])
 
   let estadoRunbook: EstadoRunbook
   if (!incidenteSelecionado) {
@@ -175,10 +328,13 @@ function App() {
     setOrigem('demo')
     setEstado({ status: 'ok', incidentes: incidentesDemo })
     setIncidenteSelecionadoId(incidentesDemo[0]?.id ?? null)
+    setSelecaoVazia(false)
     setSeverityFilter('')
     setStatusFilter('')
     setCategoryFilter('')
     setSearchFilter('')
+    setOrdenacao('recentes')
+    setAtualizadoEm(new Date().toISOString())
   }
 
   function limparFiltros(): void {
@@ -186,6 +342,10 @@ function App() {
     setStatusFilter('')
     setCategoryFilter('')
     setSearchFilter('')
+    setOrdenacao('recentes')
+    setIncidenteSelecionadoId(null)
+    setSelecaoVazia(false)
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`)
   }
 
   function tentarNovamente(): void {
@@ -195,7 +355,20 @@ function App() {
   return (
     <main>
       <header className="topbar">
-        <h1>OpsPilot · Painel de incidentes</h1>
+        <div className="topbar-main">
+          <h1>OpsPilot · Painel de incidentes</h1>
+          <button
+            type="button"
+            className="refresh-button"
+            onClick={tentarNovamente}
+            disabled={estado.status === 'loading'}
+          >
+            Atualizar
+          </button>
+          {atualizadoEm && (
+            <span className="updated-at">Atualizado {formatarDataRelativa(atualizadoEm, agora)}</span>
+          )}
+        </div>
         <span className={`source-badge${origem === 'api' ? ' is-api' : ''}`}>
           {origem === 'api' ? 'API real' : 'Dados de exemplo'}
         </span>
@@ -208,7 +381,10 @@ function App() {
             className={`severity-counter severity-${severity}`}
             key={severity}
             aria-pressed={severityFilter === severity}
-            onClick={() => setSeverityFilter((atual) => (atual === severity ? '' : severity))}
+            onClick={() => {
+              setSeverityFilter((atual) => (atual === severity ? '' : severity))
+              setSelecaoVazia(false)
+            }}
           >
             <span className="counter-label">{nomesSeveridade[severity]}</span>
             <span className="counter-value">{String(contagens[severity]).padStart(2, '0')}</span>
@@ -223,6 +399,7 @@ function App() {
               <label htmlFor="filtro-busca">Buscar</label>
               <input
                 id="filtro-busca"
+                ref={campoBuscaRef}
                 type="search"
                 placeholder="Buscar por título"
                 value={searchFilter}
@@ -261,16 +438,37 @@ function App() {
                 ))}
               </select>
             </div>
+            <div className="filter-field">
+              <label htmlFor="ordenar-incidentes">Ordenar por</label>
+              <select
+                id="ordenar-incidentes"
+                value={ordenacao}
+                onChange={(event) => {
+                  const selecionada = ordenacoes.find(
+                    (opcao) => opcao.value === event.target.value,
+                  )
+                  if (selecionada) setOrdenacao(selecionada.value)
+                }}
+              >
+                {ordenacoes.map((opcao) => (
+                  <option key={opcao.value} value={opcao.value}>{opcao.label}</option>
+                ))}
+              </select>
+            </div>
             <button type="button" className="clear-button" onClick={limparFiltros}>
               Limpar filtros
             </button>
           </section>
+          <p className="keyboard-hint">Atalhos: / buscar, ↑↓ navegar</p>
 
           <div className="dashboard-grid">
             <ListaIncidentes
               incidentes={incidentesFiltrados}
               incidenteSelecionadoId={incidenteSelecionado?.id ?? null}
-              onSelecionar={(incidente) => setIncidenteSelecionadoId(incidente.id)}
+              onSelecionar={(incidente) => {
+                setIncidenteSelecionadoId(incidente.id)
+                setSelecaoVazia(false)
+              }}
             />
             <PainelRunbook
               incidente={incidenteSelecionado}
@@ -307,6 +505,32 @@ function App() {
             </>
           )}
         </section>
+      )}
+      {estado.status === 'loading' && (
+        <div className="dashboard-grid loading-grid" aria-hidden="true">
+          <section className="incident-panel skeleton-panel">
+            <div className="panel-heading">
+              <span className="skeleton-line skeleton-heading" />
+            </div>
+            <div className="skeleton-list">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div className="skeleton-incident" key={index}>
+                  <span className="skeleton-line skeleton-title" />
+                  <span className="skeleton-line skeleton-meta" />
+                </div>
+              ))}
+            </div>
+          </section>
+          <aside className="runbook-panel skeleton-panel">
+            <div className="panel-heading">
+              <span className="skeleton-line skeleton-heading" />
+            </div>
+            <div className="skeleton-runbook">
+              <span className="skeleton-line skeleton-title" />
+              <span className="skeleton-line skeleton-meta" />
+            </div>
+          </aside>
+        </div>
       )}
     </main>
   )

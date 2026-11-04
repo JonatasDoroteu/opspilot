@@ -117,6 +117,41 @@ button {
   }
 }
 
+.topbar-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.refresh-button {
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 3px;
+  background: var(--superficie);
+  color: var(--azul-marinho);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 650;
+
+  @include foco-visivel;
+
+  &:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+}
+
+.updated-at {
+  color: var(--texto-secundario);
+  font-size: 0.72rem;
+}
+
 .eyebrow {
   margin: 0 0 5px;
   color: var(--texto-secundario);
@@ -197,7 +232,13 @@ button {
 }
 
 .filters {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 2fr)
+    minmax(170px, 1fr)
+    minmax(210px, 1.2fr)
+    minmax(220px, 1.5fr)
+    auto;
   align-items: end;
   gap: 12px;
   margin-bottom: 16px;
@@ -263,6 +304,71 @@ button {
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
   align-items: start;
   gap: 16px;
+}
+
+.keyboard-hint {
+  margin: -7px 0 16px;
+  color: var(--texto-secundario);
+  font-size: 0.78rem;
+}
+
+.loading-grid {
+  pointer-events: none;
+}
+
+.skeleton-panel {
+  overflow: hidden;
+}
+
+.skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--borda);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-heading {
+  width: 42%;
+  height: 16px;
+}
+
+.skeleton-list {
+  display: grid;
+}
+
+.skeleton-incident {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.skeleton-title {
+  width: 72%;
+  height: 12px;
+}
+
+.skeleton-meta {
+  width: 46%;
+  height: 8px;
+}
+
+.skeleton-runbook {
+  display: grid;
+  gap: 14px;
+  padding: 20px 16px;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+
+  50% {
+    opacity: 0.85;
+  }
 }
 
 .incident-panel,
@@ -355,10 +461,12 @@ button {
 
 .incident-meta {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 8px 10px;
   color: var(--texto-secundario);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
 }
 
 .incident-status {
@@ -391,7 +499,7 @@ button {
 }
 
 .severity-label {
-  font-size: 0.7rem;
+  font-size: inherit;
   font-weight: 700;
 }
 
@@ -513,8 +621,7 @@ button {
   }
 
   .filters {
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .filter-field select,
@@ -531,6 +638,16 @@ button {
   .dashboard-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .keyboard-hint {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1000px) {
+  .filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (min-width: 768px) {
@@ -544,13 +661,6 @@ button {
   #root {
     padding-right: 12px;
     padding-left: 12px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    button,
-    .incident-row {
-      transition: none;
-    }
   }
 
   .topbar {
@@ -570,5 +680,14 @@ button {
 
   .incident-row-side {
     padding-top: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .incident-row,
+  .skeleton-line {
+    transition: none;
+    animation: none;
   }
 }
