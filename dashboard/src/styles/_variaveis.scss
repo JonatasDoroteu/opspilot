@@ -4,7 +4,22 @@ $texto: #202a32;
 $texto-secundario: #65717a;
 $borda: #d5dce0;
 $azul-marinho: #203b52;
+$fundo-escuro: #12181c;
+$superficie-escura: #1c252b;
+$texto-escuro: #f2f5f7;
+$texto-secundario-escuro: #c0cbd1;
+$borda-escura: #46545d;
+$azul-foco-escuro: #81c9ef;
+$hover-escuro: #28343c;
+$selecionado-escuro: #2b3b44;
+$aberto: #805700;
+$resolvido: #17623b;
+$desconhecido: #65717a;
+$aberto-escuro: #ffd166;
+$resolvido-escuro: #75d69e;
+$desconhecido-escuro: #b4bec5;
 $critical: #8d2928;
+$critical-escuro: #ff8582;
 $high: #a64b22;
 $medium: #987218;
 $low: #647d72;
@@ -17,7 +32,7 @@ $cores-severidade: (
 
 @mixin foco-visivel {
   &:focus-visible {
-    outline: 2px solid $azul-marinho;
+    outline: 2px solid var(--cor-foco, #{$azul-marinho});
     outline-offset: 2px;
   }
 }

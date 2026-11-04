@@ -1,14 +1,55 @@
 @use './variaveis' as *;
+@use 'sass:color';
 
 :root {
   color-scheme: light;
   font-family: system-ui, 'Segoe UI', sans-serif;
-  color: $texto;
-  background: $fundo;
+  --fundo: #{$fundo};
+  --superficie: #{$superficie};
+  --texto: #{$texto};
+  --texto-secundario: #{$texto-secundario};
+  --borda: #{$borda};
+  --azul-marinho: #{$azul-marinho};
+  --cor-foco: #{$azul-marinho};
+  --hover: #f0f3f5;
+  --selecionado: #e3ebf0;
+  --indicador-selecionado: #{$azul-marinho};
+  --status-open: #{$aberto};
+  --status-resolved: #{$resolvido};
+  --status-unknown: #{$desconhecido};
+  --critical-text: #{$critical};
+  @each $severity, $severity-color in $cores-severidade {
+    --severity-text-#{$severity}: #{color.adjust($severity-color, $lightness: -10%)};
+  }
+  color: var(--texto);
+  background: var(--fundo);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fundo: #{$fundo-escuro};
+    --superficie: #{$superficie-escura};
+    --texto: #{$texto-escuro};
+    --texto-secundario: #{$texto-secundario-escuro};
+    --borda: #{$borda-escura};
+    --azul-marinho: #{$azul-foco-escuro};
+    --cor-foco: #{$azul-foco-escuro};
+    --hover: #{$hover-escuro};
+    --selecionado: #{$selecionado-escuro};
+    --indicador-selecionado: #{$azul-foco-escuro};
+    --status-open: #{$aberto-escuro};
+    --status-resolved: #{$resolvido-escuro};
+    --status-unknown: #{$desconhecido-escuro};
+    --critical-text: #{$critical-escuro};
+    @each $severity, $severity-color in $cores-severidade {
+      --severity-text-#{$severity}: #{color.adjust($severity-color, $lightness: 35%)};
+    }
+  }
 }
 
 * {
@@ -19,8 +60,15 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: $fundo;
-  color: $texto;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+button {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
 button,
@@ -58,11 +106,11 @@ button {
   justify-content: space-between;
   gap: 20px;
   padding: 24px 0 18px;
-  border-bottom: 1px solid $borda;
+  border-bottom: 1px solid var(--borda);
 
   h1 {
     margin: 0;
-    color: $texto;
+    color: var(--texto);
     font-size: clamp(1.25rem, 3vw, 1.65rem);
     font-weight: 650;
     letter-spacing: -0.035em;
@@ -71,7 +119,7 @@ button {
 
 .eyebrow {
   margin: 0 0 5px;
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.67rem;
   font-weight: 700;
   letter-spacing: 0.11em;
@@ -82,15 +130,15 @@ button {
 .source-badge {
   flex: 0 0 auto;
   padding: 5px 8px;
-  border: 1px solid $borda;
+  border: 1px solid var(--borda);
   border-radius: 3px;
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.72rem;
   font-weight: 650;
 
   &.is-api {
-    border-color: $azul-marinho;
-    color: $azul-marinho;
+    border-color: var(--azul-marinho);
+    color: var(--azul-marinho);
   }
 }
 
@@ -107,10 +155,10 @@ button {
   justify-content: space-between;
   min-height: 58px;
   padding: 10px 12px;
-  border: 1px solid $borda;
+  border: 1px solid var(--borda);
   border-top: 3px solid var(--severity-color);
   border-radius: 3px;
-  background: $superficie;
+  background: var(--superficie);
   cursor: pointer;
   text-align: left;
 
@@ -118,12 +166,12 @@ button {
 
   &:hover,
   &[aria-pressed='true'] {
-    border-color: $azul-marinho;
+    border-color: var(--azul-marinho);
     border-top-color: var(--severity-color);
   }
 
   .counter-label {
-    color: $texto-secundario;
+    color: var(--texto-secundario);
     font-size: 0.73rem;
     font-weight: 650;
     text-transform: uppercase;
@@ -140,10 +188,11 @@ button {
 @each $severity, $color in $cores-severidade {
   .severity-#{$severity} {
     --severity-color: #{$color};
+    --severity-pill-background: #{color.adjust($color, $lightness: -12%)};
   }
 
   .severity-text-#{$severity} {
-    color: $color;
+    color: var(--severity-text-#{$severity});
   }
 }
 
@@ -153,9 +202,9 @@ button {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px;
-  border: 1px solid $borda;
+  border: 1px solid var(--borda);
   border-radius: 3px;
-  background: $superficie;
+  background: var(--superficie);
 }
 
 .filter-field {
@@ -163,7 +212,7 @@ button {
   gap: 5px;
 
   label {
-    color: $texto-secundario;
+    color: var(--texto-secundario);
     font-size: 0.67rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -174,10 +223,10 @@ button {
   input {
     min-width: 150px;
     padding: 7px 28px 7px 8px;
-    border: 1px solid $borda;
+    border: 1px solid var(--borda);
     border-radius: 3px;
-    background: $superficie;
-    color: $texto;
+    background: var(--superficie);
+    color: var(--texto);
 
     @include foco-visivel;
   }
@@ -194,10 +243,10 @@ button {
 .clear-button,
 .text-button {
   padding: 7px 9px;
-  border: 1px solid $borda;
+  border: 1px solid var(--borda);
   border-radius: 3px;
   background: transparent;
-  color: $azul-marinho;
+  color: var(--azul-marinho);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 650;
@@ -205,7 +254,7 @@ button {
   @include foco-visivel;
 
   &:hover {
-    background: #f0f3f5;
+    background: var(--hover);
   }
 }
 
@@ -219,9 +268,9 @@ button {
 .incident-panel,
 .runbook-panel {
   min-width: 0;
-  border: 1px solid $borda;
+  border: 1px solid var(--borda);
   border-radius: 3px;
-  background: $superficie;
+  background: var(--superficie);
 }
 
 .panel-heading {
@@ -230,11 +279,11 @@ button {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid $borda;
+  border-bottom: 1px solid var(--borda);
 
   h2 {
     margin: 0;
-    color: $texto;
+    color: var(--texto);
     font-size: 1.05rem;
     font-weight: 650;
     letter-spacing: -0.015em;
@@ -242,7 +291,7 @@ button {
 }
 
 .panel-count {
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.9rem;
 }
 
@@ -252,7 +301,7 @@ button {
   list-style: none;
 
   li + li {
-    border-top: 1px solid $borda;
+    border-top: 1px solid var(--borda);
   }
 }
 
@@ -265,15 +314,23 @@ button {
   padding: 12px 14px 12px 13px;
   border: 0;
   border-left: 4px solid var(--severity-color);
-  background: $superficie;
+  background: var(--superficie);
   cursor: pointer;
   text-align: left;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
 
   @include foco-visivel;
 
   &:hover,
   &.is-selected {
-    background: #f3f6f7;
+    background: var(--hover);
+  }
+
+  &.is-selected {
+    border-left-color: var(--indicador-selecionado);
+    background: var(--selecionado);
   }
 }
 
@@ -300,34 +357,56 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 10px;
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.72rem;
 }
 
-.incident-status-unknown {
+.incident-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  &::before {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+  }
+}
+
+.incident-status--open {
+  color: var(--status-open);
+}
+
+.incident-status--resolved {
+  color: var(--status-resolved);
+}
+
+.incident-status--unknown {
   padding: 1px 4px;
-  border: 1px solid $borda;
   border-radius: 3px;
-  color: $texto-secundario;
+  color: var(--status-unknown);
 }
 
 .severity-label {
   font-size: 0.7rem;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
 .incident-id,
 .incident-date {
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.7rem;
 }
 
 .severity-badge {
   padding: 4px 7px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  color: var(--severity-color);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--severity-pill-background);
+  color: #fff;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -337,13 +416,13 @@ button {
 .runbook-message {
   margin: 0;
   padding: 18px 16px;
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.86rem;
   line-height: 1.5;
 }
 
 .runbook-error {
-  color: $critical;
+  color: var(--critical-text);
 
   .text-button {
     margin-top: 12px;
@@ -361,7 +440,7 @@ button {
 }
 
 .runbook-incident {
-  color: $texto-secundario;
+  color: var(--texto-secundario);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -372,8 +451,8 @@ button {
   justify-content: space-between;
   gap: 10px;
   padding: 10px 0;
-  border-top: 1px solid $borda;
-  border-bottom: 1px solid $borda;
+  border-top: 1px solid var(--borda);
+  border-bottom: 1px solid var(--borda);
 }
 
 .runbook-steps {
@@ -384,13 +463,13 @@ button {
 
   li {
     padding-left: 3px;
-    color: $texto;
+    color: var(--texto);
     font-size: 0.84rem;
     line-height: 1.5;
   }
 
   li::marker {
-    color: $azul-marinho;
+    color: var(--azul-marinho);
     font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
     font-weight: 700;
   }
@@ -399,11 +478,11 @@ button {
 .status-area {
   margin: 0 0 16px;
   padding: 13px 15px;
-  border: 1px solid $borda;
-  border-left: 4px solid $azul-marinho;
+  border: 1px solid var(--borda);
+  border-left: 4px solid var(--azul-marinho);
   border-radius: 3px;
-  background: $superficie;
-  color: $texto-secundario;
+  background: var(--superficie);
+  color: var(--texto-secundario);
   font-size: 0.84rem;
   line-height: 1.5;
 
@@ -419,8 +498,8 @@ button {
 }
 
 .status-error {
-  border-left-color: $critical;
-  color: $critical;
+  border-left-color: var(--critical-text);
+  color: var(--critical-text);
 }
 
 @media (max-width: 767.98px) {
@@ -454,10 +533,24 @@ button {
   }
 }
 
+@media (min-width: 768px) {
+  .runbook-panel {
+    position: sticky;
+    top: 16px;
+  }
+}
+
 @media (max-width: 520px) {
   #root {
     padding-right: 12px;
     padding-left: 12px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button,
+    .incident-row {
+      transition: none;
+    }
   }
 
   .topbar {
