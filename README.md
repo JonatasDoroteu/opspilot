@@ -55,13 +55,15 @@ Abre http://localhost:8000/docs — Swagger já vem pronto (FastAPI gera sozinho
 
 ## Passo 4 — Criar o workflow no n8n
 
-1. Abre http://localhost:5678 (login: `admin` / `admin123`)
+1. Abre http://localhost:5678 (login: `admin` / `admin123`). Essas são as credenciais do `docker-compose` local, apenas para desenvolvimento; nunca as use em produção.
 2. Cria um workflow novo
 3. Nó 1: **Webhook** — método `POST`, path `incident-created` (tem que bater com `N8N_WEBHOOK_URL` do `.env`)
 4. Nó 2: qualquer ação (Discord, Slack, ou até um nó "NoOp" pra começar)
 5. Ativa o workflow (toggle no canto superior direito)
 
 ## Passo 5 — Testar o fluxo
+
+> Nos exemplos de `curl`, MCP e Claude Desktop, `troque-essa-chave` é um valor de exemplo para o ambiente local e deve ser trocado pela chave configurada nesse ambiente.
 
 ```bash
 curl -X POST http://localhost:8000/incidents \
@@ -159,6 +161,8 @@ O plano gratuito do Gemini tem cota diária baixa, por isso o eval roda em lotes
 
 **Resultado** (modelo: `TODO`, data: `TODO`):
 
+Resultado ainda não publicado: rodar em lotes por causa da cota gratuita do Gemini.
+
 | Métrica | Acertos |
 |---|---|
 | Categoria | TODO / 24 |
@@ -228,7 +232,9 @@ O agente busca a categoria do incidente e devolve o runbook certo automaticament
 
 1. Crie o projeto Supabase, execute `supabase/schema.sql` e aplique as migrações pendentes em `supabase/migrations/`.
 2. No Render, crie um Web Service a partir deste repositório e faça o deploy pelo `Dockerfile`.
-3. Configure no serviço da API as variáveis `DATABASE_URL` (URL do pooler Supabase usando `postgresql+asyncpg://`), `API_KEY` (segredo forte), `N8N_WEBHOOK_URL` (URL de produção do webhook n8n), `ENVIRONMENT=production` e, para habilitar a triagem, `GEMINI_API_KEY`.
+3. Configure no serviço da API as variáveis `DATABASE_URL` (URL do pooler Supabase usando `postgresql+asyncpg://`), `API_KEY` (segredo forte), `N8N_WEBHOOK_URL` (URL de produção do webhook n8n), `ENVIRONMENT=production`, `GEMINI_API_KEY` (para habilitar a triagem) e `CORS_ORIGINS`.
+
+   `CORS_ORIGINS` é uma lista de origens separadas por vírgula, sem barra final (por exemplo, `https://opspilot-phi.vercel.app`). Se ficar vazia, nenhuma origem é liberada e o painel publicado não consegue consultar a API.
 4. Gere um domínio público para o serviço Render. A documentação ficará em `https://<dominio-gerado>/docs`.
 5. No n8n Cloud, crie um workflow com um nó **Webhook** (`POST`, path `incident-created`) e ative-o. Copie a **Production URL** do nó e defina-a como `N8N_WEBHOOK_URL` no Render. O fluxo é API publicada → webhook do n8n Cloud.
 6. Valide `https://<dominio-gerado>/health` e crie um incidente de teste para confirmar a execução do workflow.
@@ -261,6 +267,7 @@ O painel em `dashboard/` é uma interface somente leitura para consultar `GET /i
 ### Funcionalidades
 
 - Lista incidentes com título, severidade, categoria, status e data de criação.
+- Permite ativar a atualização automática a cada 60 segundos (desligada por padrão), pausada enquanto a aba está oculta; falhas mantêm os dados exibidos.
 - Permite buscar incidentes pelo título, sem diferenciar maiúsculas/minúsculas ou acentos.
 - Os atalhos `/` e `↑↓` ajudam na navegação; filtros, ordenação e incidente selecionado podem ser compartilhados pela URL.
 - Exibe contadores por severidade que podem ser usados como filtro, além de filtros por status e categoria e a opção de limpar filtros.
@@ -279,8 +286,8 @@ Versões declaradas em `dashboard/package.json`:
 ### Decisões técnicas
 
 - O painel faz somente requisições `GET`; não armazena nem envia API key.
-- O proxy de desenvolvimento do Vite encaminha `/incidents`, `/runbooks` e `/health` para a API local em `http://localhost:8000`, evitando uma chamada cross-origin do navegador sem exigir alteração no back-end.
-- As chamadas usam `fetch` com `AbortController` e timeout de 90 segundos.
+- O proxy do Vite vale apenas no desenvolvimento local e encaminha `/incidents`, `/runbooks` e `/health` para `http://localhost:8000`. Em produção, o painel usa `VITE_API_URL` e a API libera origens explicitamente configuradas em `CORS_ORIGINS` (somente `GET`, sem `*` e com credenciais desabilitadas).
+- As chamadas usam `fetch` com `AbortController` e timeout de 90 segundos; uma nova busca cancela a anterior, e atualizações em segundo plano preservam a lista enquanto aguardam resposta.
 - O JSON recebido é validado com funções de checagem de tipo, sem `any` ou assertions `as`.
 - Os estados de carregamento, erro e sucesso são representados por uniões discriminadas em TypeScript.
 - O SASS usa variáveis, um map de cores de severidade percorrido com `@each`, um mixin de foco e parciais importados com `@use`.
@@ -305,7 +312,7 @@ O back-end restringe o status a `open` ou `resolved`; o painel mostra `Desconhec
 
 ## Deploy do painel
 
-Publique `dashboard/` na Vercel com `VITE_API_URL=https://opspilot-yme6.onrender.com`. No Render, configure `CORS_ORIGINS` com a URL do painel, sem barra final. Painel: `https://<url-do-painel>`.
+Publique `dashboard/` na Vercel com `VITE_API_URL=https://opspilot-yme6.onrender.com`. No Render, configure `CORS_ORIGINS` com a URL do painel, sem barra final. Painel: [https://opspilot-phi.vercel.app](https://opspilot-phi.vercel.app).
 
 ### Estrutura do dashboard
 
