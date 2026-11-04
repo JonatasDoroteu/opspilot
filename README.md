@@ -261,6 +261,7 @@ O painel em `dashboard/` é uma interface somente leitura para consultar `GET /i
 ### Funcionalidades
 
 - Lista incidentes com título, severidade, categoria, status e data de criação.
+- Permite buscar incidentes pelo título, sem diferenciar maiúsculas/minúsculas ou acentos.
 - Exibe contadores por severidade que podem ser usados como filtro, além de filtros por status e categoria e a opção de limpar filtros.
 - Mostra o runbook da categoria do incidente selecionado ou informa quando não há runbook cadastrado para a categoria.
 - Apresenta estados de carregamento, erro e lista vazia. Se a API retornar erro, permite tentar novamente ou usar dados de exemplo.
