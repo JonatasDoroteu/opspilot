@@ -48,16 +48,24 @@ function isRunbook(value: unknown): value is Runbook {
   )
 }
 
-async function buscarJson(path: string): Promise<Response> {
+async function buscarJson(path: string, signal?: AbortSignal): Promise<Response> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 90_000)
+  let timedOut = false
+  const timeout = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, 90_000)
+  const cancelar = (): void => controller.abort()
+  signal?.addEventListener('abort', cancelar, { once: true })
 
   try {
     // Sem base configurada, mantém o proxy local do Vite.
     return await fetch(path, { signal: controller.signal })
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('A API demorou mais de 90 segundos para responder.')
+      throw new Error(
+        timedOut ? 'A API demorou mais de 90 segundos para responder.' : 'A solicitação foi cancelada.',
+      )
     }
     if (error instanceof TypeError) {
       throw new Error('Não foi possível conectar à API. Verifique a conexão e tente novamente.')
@@ -65,6 +73,7 @@ async function buscarJson(path: string): Promise<Response> {
     throw new Error('Ocorreu um erro inesperado ao consultar a API.')
   } finally {
     window.clearTimeout(timeout)
+    signal?.removeEventListener('abort', cancelar)
   }
 }
 
@@ -77,8 +86,8 @@ async function lerJson(response: Response): Promise<unknown> {
   }
 }
 
-export async function buscarIncidentes(): Promise<Incident[]> {
-  const response = await buscarJson(`${apiBaseUrl}/incidents`)
+export async function buscarIncidentes(signal?: AbortSignal): Promise<Incident[]> {
+  const response = await buscarJson(`${apiBaseUrl}/incidents`, signal)
   if (!response.ok) {
     throw new Error(`A API respondeu com erro HTTP ${response.status} ao buscar incidentes.`)
   }

@@ -58,7 +58,7 @@ export function PainelRunbook({
           <h3>{estado.runbook.title}</h3>
           <div className="runbook-detail">
             <span className="eyebrow">Severidade do runbook</span>
-            <span className={`severity-label severity-text-${estado.runbook.severity}`}>
+            <span className={`severity-badge severity-${estado.runbook.severity}`}>
               {nomesSeveridade[estado.runbook.severity]}
             </span>
           </div>
