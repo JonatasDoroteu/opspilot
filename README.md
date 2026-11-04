@@ -267,6 +267,7 @@ O painel em `dashboard/` é uma interface somente leitura para consultar `GET /i
 ### Funcionalidades
 
 - Lista incidentes com título, severidade, categoria, status e data de criação.
+- Permite ativar a atualização automática a cada 60 segundos (desligada por padrão), pausada enquanto a aba está oculta; falhas mantêm os dados exibidos.
 - Permite buscar incidentes pelo título, sem diferenciar maiúsculas/minúsculas ou acentos.
 - Os atalhos `/` e `↑↓` ajudam na navegação; filtros, ordenação e incidente selecionado podem ser compartilhados pela URL.
 - Exibe contadores por severidade que podem ser usados como filtro, além de filtros por status e categoria e a opção de limpar filtros.
@@ -285,8 +286,8 @@ Versões declaradas em `dashboard/package.json`:
 ### Decisões técnicas
 
 - O painel faz somente requisições `GET`; não armazena nem envia API key.
-- O proxy do Vite vale apenas no desenvolvimento local e encaminha `/incidents`, `/runbooks` e `/health` para `http://localhost:8000`. Em produção, o painel usa `VITE_API_URL` e a API libera origens explicitamente configuradas em `CORS_ORIGINS` (somente `GET`, sem `*` e sem credentials CORS).
-- As chamadas usam `fetch` com `AbortController` e timeout de 90 segundos.
+- O proxy do Vite vale apenas no desenvolvimento local e encaminha `/incidents`, `/runbooks` e `/health` para `http://localhost:8000`. Em produção, o painel usa `VITE_API_URL` e a API libera origens explicitamente configuradas em `CORS_ORIGINS` (somente `GET`, sem `*` e com credenciais desabilitadas).
+- As chamadas usam `fetch` com `AbortController` e timeout de 90 segundos; uma nova busca cancela a anterior, e atualizações em segundo plano preservam a lista enquanto aguardam resposta.
 - O JSON recebido é validado com funções de checagem de tipo, sem `any` ou assertions `as`.
 - Os estados de carregamento, erro e sucesso são representados por uniões discriminadas em TypeScript.
 - O SASS usa variáveis, um map de cores de severidade percorrido com `@each`, um mixin de foco e parciais importados com `@use`.

@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buscarIncidentes, buscarRunbook } from './api'
 import { incidentesDemo, runbooksDemo } from './dadosDemo'
 import { ListaIncidentes } from './components/ListaIncidentes'
 import { PainelRunbook } from './components/PainelRunbook'
-import { formatarDataRelativa } from './dataRelativa'
 import { filtrarIncidentes } from './filtrarIncidentes'
 import { ordenarIncidentes } from './ordenarIncidentes'
 import type { OrdenacaoIncidentes } from './ordenarIncidentes'
@@ -28,6 +27,7 @@ type ResultadoRunbook = {
 type OrigemDados = 'api' | 'demo'
 
 const INCIDENTES_VAZIOS: Incident[] = []
+const INTERVALO_ATUALIZACAO_MS = 60_000
 const severidades: Severity[] = ['critical', 'high', 'medium', 'low']
 const ordenacoes: { value: OrdenacaoIncidentes; label: string }[] = [
   { value: 'recentes', label: 'Mais recentes' },
@@ -85,6 +85,8 @@ function App() {
   const [estado, setEstado] = useState<EstadoIncidentes>({ status: 'loading' })
   const [apiDemorando, setApiDemorando] = useState(false)
   const [origem, setOrigem] = useState<OrigemDados>('api')
+  const [atualizacaoAutomatica, setAtualizacaoAutomatica] = useState(false)
+  const [erroAtualizacao, setErroAtualizacao] = useState<string | null>(null)
   const [severityFilter, setSeverityFilter] = useState<Severity | ''>(lerSeveridadeInicial)
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>(lerStatusInicial)
   const [categoryFilter, setCategoryFilter] = useState<Category | ''>(lerCategoriaInicial)
@@ -97,57 +99,112 @@ function App() {
     () => parametrosIniciais().has('incident') && parametrosIniciais().get('incident') === '',
   )
   const [resultadoRunbook, setResultadoRunbook] = useState<ResultadoRunbook | null>(null)
-  const [tentativa, setTentativa] = useState(0)
   const [tentativaRunbook, setTentativaRunbook] = useState(0)
-  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null)
-  const [agora, setAgora] = useState(() => new Date())
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
   const campoBuscaRef = useRef<HTMLInputElement>(null)
+  const requisicaoRef = useRef<AbortController | null>(null)
+  const estadoRef = useRef(estado)
+  const origemRef = useRef(origem)
+
+  function definirEstado(novoEstado: EstadoIncidentes): void {
+    estadoRef.current = novoEstado
+    setEstado(novoEstado)
+  }
+
+  function definirOrigem(novaOrigem: OrigemDados): void {
+    if (origemRef.current === novaOrigem) return
+    origemRef.current = novaOrigem
+    setOrigem(novaOrigem)
+  }
+
+  const atualizarIncidentes = useCallback(async (): Promise<void> => {
+    const manterDados = estadoRef.current.status === 'ok' && origemRef.current === 'api'
+    requisicaoRef.current?.abort()
+    const controller = new AbortController()
+    requisicaoRef.current = controller
+
+    if (!manterDados) {
+      if (estadoRef.current.status !== 'loading') {
+        setApiDemorando(false)
+        definirEstado({ status: 'loading' })
+      }
+      definirOrigem('api')
+    }
+
+    try {
+      const incidentes = await buscarIncidentes(controller.signal)
+      if (requisicaoRef.current !== controller) return
+      definirEstado({ status: 'ok', incidentes })
+      definirOrigem('api')
+      setErroAtualizacao(null)
+      setAtualizadoEm(new Date())
+    } catch (error: unknown) {
+      if (requisicaoRef.current !== controller || controller.signal.aborted) return
+      const mensagem =
+        error instanceof Error ? error.message : 'Erro inesperado ao carregar incidentes.'
+      if (estadoRef.current.status === 'ok' && origemRef.current === 'api') {
+        setErroAtualizacao(
+          `Não foi possível atualizar os incidentes. Os dados exibidos foram mantidos. ${mensagem}`,
+        )
+      } else {
+        definirEstado({ status: 'error', mensagem })
+      }
+    } finally {
+      if (requisicaoRef.current === controller) requisicaoRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     let ativo = true
-    const controller = new AbortController()
+    queueMicrotask(() => {
+      if (ativo) void atualizarIncidentes()
+    })
+    return () => {
+      ativo = false
+      requisicaoRef.current?.abort()
+      requisicaoRef.current = null
+    }
+  }, [atualizarIncidentes])
 
-    async function carregar(): Promise<void> {
-      setApiDemorando(false)
-      setEstado({ status: 'loading' })
-      setOrigem('api')
-      try {
-        const incidentes = await buscarIncidentes(controller.signal)
-        if (ativo) {
-          setEstado({ status: 'ok', incidentes })
-          setAtualizadoEm(new Date().toISOString())
-          setIncidenteSelecionadoId((idAtual) =>
-            idAtual && incidentes.some((incidente) => incidente.id === idAtual) ? idAtual : null,
-          )
+  useEffect(() => {
+    if (!atualizacaoAutomatica || origem !== 'api') return
+
+    let interval: number | null = null
+    function sincronizarIntervalo(): void {
+      if (document.visibilityState === 'visible') {
+        if (interval === null) {
+          interval = window.setInterval(() => {
+            if (document.visibilityState === 'visible') void atualizarIncidentes()
+          }, INTERVALO_ATUALIZACAO_MS)
         }
-      } catch (error: unknown) {
-        if (ativo) {
-          setEstado({
-            status: 'error',
-            mensagem: error instanceof Error ? error.message : 'Erro inesperado ao carregar incidentes.',
-          })
-        }
+      } else if (interval !== null) {
+        window.clearInterval(interval)
+        interval = null
       }
     }
 
-    void carregar()
-    return () => {
-      ativo = false
-      controller.abort()
+    function lidarComVisibilidade(): void {
+      const estavaPausado = interval === null
+      sincronizarIntervalo()
+      if (estavaPausado && document.visibilityState === 'visible') {
+        void atualizarIncidentes()
+      }
     }
-  }, [tentativa])
 
-  useEffect(() => {
-    const interval = window.setInterval(() => setAgora(new Date()), 30_000)
-    return () => window.clearInterval(interval)
-  }, [])
+    document.addEventListener('visibilitychange', lidarComVisibilidade)
+    sincronizarIntervalo()
+    return () => {
+      document.removeEventListener('visibilitychange', lidarComVisibilidade)
+      if (interval !== null) window.clearInterval(interval)
+    }
+  }, [atualizacaoAutomatica, origem, atualizarIncidentes])
 
   useEffect(() => {
     if (estado.status !== 'loading') return
 
     const timeout = window.setTimeout(() => setApiDemorando(true), 5_000)
     return () => window.clearTimeout(timeout)
-  }, [estado.status, tentativa])
+  }, [estado.status])
 
   const incidentes = estado.status === 'ok' ? estado.incidentes : INCIDENTES_VAZIOS
   const contagens = useMemo(
@@ -325,8 +382,10 @@ function App() {
   }
 
   function usarDadosDemo(): void {
-    setOrigem('demo')
-    setEstado({ status: 'ok', incidentes: incidentesDemo })
+    requisicaoRef.current?.abort()
+    requisicaoRef.current = null
+    definirOrigem('demo')
+    definirEstado({ status: 'ok', incidentes: incidentesDemo })
     setIncidenteSelecionadoId(incidentesDemo[0]?.id ?? null)
     setSelecaoVazia(false)
     setSeverityFilter('')
@@ -334,7 +393,7 @@ function App() {
     setCategoryFilter('')
     setSearchFilter('')
     setOrdenacao('recentes')
-    setAtualizadoEm(new Date().toISOString())
+    setErroAtualizacao(null)
   }
 
   function limparFiltros(): void {
@@ -349,7 +408,7 @@ function App() {
   }
 
   function tentarNovamente(): void {
-    setTentativa((valor) => valor + 1)
+    void atualizarIncidentes()
   }
 
   return (
@@ -357,16 +416,33 @@ function App() {
       <header className="topbar">
         <div className="topbar-main">
           <h1>OpsPilot · Painel de incidentes</h1>
-          <button
-            type="button"
-            className="refresh-button"
-            onClick={tentarNovamente}
-            disabled={estado.status === 'loading'}
-          >
-            Atualizar
-          </button>
-          {atualizadoEm && (
-            <span className="updated-at">Atualizado {formatarDataRelativa(atualizadoEm, agora)}</span>
+          <div className="refresh-controls">
+            <button type="button" className="refresh-button" onClick={tentarNovamente}>
+              Atualizar
+            </button>
+            <label className="auto-refresh-toggle">
+              <input
+                type="checkbox"
+                checked={atualizacaoAutomatica}
+                onChange={(event) => setAtualizacaoAutomatica(event.target.checked)}
+              />
+              Atualização automática (60 segundos)
+            </label>
+            {atualizadoEm && (
+              <span className="updated-at" role="status" aria-live="polite">
+                Atualizado às{' '}
+                {new Intl.DateTimeFormat('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                }).format(atualizadoEm)}
+              </span>
+            )}
+          </div>
+          {erroAtualizacao && (
+            <p className="update-warning" role="status" aria-live="polite">
+              {erroAtualizacao}
+            </p>
           )}
         </div>
         <span className={`source-badge${origem === 'api' ? ' is-api' : ''}`}>
