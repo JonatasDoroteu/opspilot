@@ -11,7 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import settings
-from app.services.triage import TriageError, triage_incident
+from app.services.triage import triage_incident
 
 CASES_PATH = Path(__file__).with_name("cases.json")
 RESULTS_DIR = Path(__file__).with_name("resultados")
@@ -43,21 +43,19 @@ def safe_error_message(error: Exception) -> str:
     return message
 
 
-def is_rate_limited(error: Exception) -> bool:
-    if getattr(error, "code", None) == 429:
-        return True
-    return isinstance(error, TriageError) and "HTTP 429" in str(error)
-
-
 async def evaluate_cases(
     cases: list[dict[str, Any]],
     start_index: int,
     sleep_seconds: float,
     save_progress: Callable[[list[dict[str, Any]]], None],
+    case_numbers: list[int] | None = None,
+    initial_attempts: list[int] | None = None,
 ) -> list[dict[str, Any]]:
     results = []
     for index, case in enumerate(cases):
-        case_number = start_index + index + 1
+        case_number = (
+            case_numbers[index] if case_numbers is not None else start_index + index + 1
+        )
         result: dict[str, Any] = {
             "id": case.get("id", f"case-{index + 1}"),
             "case_number": case_number,
@@ -69,9 +67,18 @@ async def evaluate_cases(
             "obtained": None,
             "reason": None,
             "error": None,
+            "attempts": (
+                initial_attempts[index] if initial_attempts is not None else 0
+            ),
         }
+
+        def record_attempt() -> None:
+            result["attempts"] += 1
+
         try:
-            triage = await triage_incident(case["title"], case.get("description"))
+            triage = await triage_incident(
+                case["title"], case.get("description"), on_attempt=record_attempt
+            )
             result["obtained"] = {
                 "category": triage.category,
                 "severity": triage.severity,
@@ -85,8 +92,7 @@ async def evaluate_cases(
             )
             result["status"] = "evaluated"
         except Exception as error:
-            rate_limited = is_rate_limited(error)
-            result["status"] = "rate_limited" if rate_limited else "error"
+            result["status"] = "error"
             result["error"] = {
                 "type": type(error).__name__,
                 "message": safe_error_message(error),
@@ -94,12 +100,6 @@ async def evaluate_cases(
         results.append(result)
         save_progress(results)
         print(f"[{case_number}] {case['title']}: {result['status']}")
-        if result["status"] == "rate_limited":
-            print(
-                f"\033[1;31m429 após retries; eval interrompido no caso "
-                f"{case_number} ({result['id']}): {case['title']}\033[0m"
-            )
-            break
         if index < len(cases) - 1:
             await asyncio.sleep(sleep_seconds)
     return results
@@ -228,16 +228,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sleep",
         type=float,
-        default=5,
-        help="Pausa em segundos entre chamadas (padrão: 5).",
+        help="Pausa em segundos entre casos (padrão: 5; retomada usa o valor anterior).",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Retoma os casos com erro a partir de um JSON anterior.",
+    )
+    parser.add_argument(
+        "--assume-previous-model",
+        help="Modelo do JSON anterior caso ele não tenha o campo model.",
     )
     args = parser.parse_args()
     if args.start < 0:
         parser.error("--start não pode ser negativo.")
     if args.limit is not None and args.limit < 1:
         parser.error("--limit precisa ser pelo menos 1.")
-    if args.sleep < 0:
+    if args.sleep is not None and args.sleep < 0:
         parser.error("--sleep não pode ser negativo.")
+    if args.assume_previous_model and not args.resume_from:
+        parser.error("--assume-previous-model requer --resume-from.")
     return args
 
 
@@ -249,34 +259,170 @@ async def main() -> int:
         print(f"Erro ao carregar casos: {error}", file=sys.stderr)
         return 2
 
-    selected_cases = all_cases[args.start :]
-    if args.limit is not None:
-        selected_cases = selected_cases[: args.limit]
-    if not selected_cases:
-        print("Nenhum caso selecionado; confira --start e --limit.", file=sys.stderr)
+    model = settings.gemini_model
+    if not model:
+        print("Erro: GEMINI_MODEL não configurado.", file=sys.stderr)
         return 2
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    all_cases_by_id = {
+        case.get("id", f"case-{index + 1}"): (index + 1, case)
+        for index, case in enumerate(all_cases)
+    }
+    if args.resume_from:
+        try:
+            previous = json.loads(args.resume_from.read_text(encoding="utf-8"))
+            if not isinstance(previous, dict):
+                raise ValueError("o JSON anterior precisa conter um objeto na raiz.")
+            previous_results = previous["results"]
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            print(f"Erro ao carregar resultados para retomada: {error}", file=sys.stderr)
+            return 2
+        if not isinstance(previous_results, list):
+            print("Erro: o campo results do JSON anterior precisa ser uma lista.", file=sys.stderr)
+            return 2
+        previous_model = previous.get("model") or args.assume_previous_model
+        if not previous_model:
+            print(
+                "Erro: o JSON anterior não tem model; informe "
+                "--assume-previous-model <nome>.",
+                file=sys.stderr,
+            )
+            return 2
+        if previous_model != model:
+            print(
+                f"Erro: modelo incompatível (anterior: {previous_model}; atual: {model}).",
+                file=sys.stderr,
+            )
+            return 2
+
+        results = []
+        retry_cases = []
+        retry_case_numbers = []
+        retry_initial_attempts = []
+        seen_case_ids = set()
+        for previous_result in previous_results:
+            if not isinstance(previous_result, dict):
+                print("Erro: item inválido na lista results do JSON anterior.", file=sys.stderr)
+                return 2
+            case_id = previous_result.get("id")
+            if case_id not in all_cases_by_id:
+                print(f"Erro: caso desconhecido no JSON anterior: {case_id}.", file=sys.stderr)
+                return 2
+            if case_id in seen_case_ids:
+                print(f"Erro: caso duplicado no JSON anterior: {case_id}.", file=sys.stderr)
+                return 2
+            seen_case_ids.add(case_id)
+            result = dict(previous_result)
+            result.setdefault("attempts", None)
+            results.append(result)
+            if result.get("status") == "error":
+                case_number, case = all_cases_by_id[case_id]
+                previous_attempts = result.get("attempts")
+                if previous_attempts is not None and (
+                    isinstance(previous_attempts, bool)
+                    or not isinstance(previous_attempts, int)
+                    or previous_attempts < 0
+                ):
+                    print(
+                        f"Erro: attempts inválido para o caso {case_id}.",
+                        file=sys.stderr,
+                    )
+                    return 2
+                retry_cases.append(case)
+                retry_case_numbers.append(case_number)
+                retry_initial_attempts.append(previous_attempts or 0)
+
+        sleep_seconds = (
+            args.sleep
+            if args.sleep is not None
+            else float(previous.get("sleep_seconds", 5))
+        )
+        metadata = {
+            key: previous.get(key)
+            for key in ("start", "limit", "total_cases")
+        }
+        metadata.update(
+            {
+                "timestamp_utc": datetime.now(timezone.utc).strftime(
+                    "%Y%m%dT%H%M%S%fZ"
+                ),
+                "sleep_seconds": sleep_seconds,
+                "model": model,
+            }
+        )
+    else:
+        selected_cases = all_cases[args.start :]
+        if args.limit is not None:
+            selected_cases = selected_cases[: args.limit]
+        if not selected_cases:
+            print("Nenhum caso selecionado; confira --start e --limit.", file=sys.stderr)
+            return 2
+        retry_cases = selected_cases
+        retry_case_numbers = list(
+            range(args.start + 1, args.start + len(selected_cases) + 1)
+        )
+        sleep_seconds = args.sleep if args.sleep is not None else 5
+        results = []
+        metadata = {
+            "start": args.start,
+            "limit": args.limit,
+            "total_cases": len(all_cases),
+            "sleep_seconds": sleep_seconds,
+            "model": model,
+        }
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    metadata["timestamp_utc"] = timestamp
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = RESULTS_DIR / f"triage_eval_{timestamp}.json"
-    metadata = {
-        "timestamp_utc": timestamp,
-        "start": args.start,
-        "limit": args.limit,
-        "sleep_seconds": args.sleep,
-        "total_cases": len(all_cases),
-    }
-    results = await evaluate_cases(
-        selected_cases,
-        args.start,
-        args.sleep,
-        lambda current_results: save_results(
-            output_path, metadata, current_results
-        ),
-    )
-    summary = print_summary(results, len(selected_cases))
+    suffix = 1
+    while output_path.exists():
+        timestamp = (
+            datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+            + f"-{suffix}"
+        )
+        metadata["timestamp_utc"] = timestamp
+        output_path = RESULTS_DIR / f"triage_eval_{timestamp}.json"
+        suffix += 1
+
+    if args.resume_from:
+        result_positions = {result["id"]: index for index, result in enumerate(results)}
+
+        def save_merged_progress(current_results: list[dict[str, Any]]) -> None:
+            for current_result in current_results:
+                results[result_positions[current_result["id"]]] = current_result
+            save_results(output_path, metadata, results)
+
+        save_results(output_path, metadata, results)
+        await evaluate_cases(
+            retry_cases,
+            0,
+            sleep_seconds,
+            save_merged_progress,
+            case_numbers=retry_case_numbers,
+            initial_attempts=retry_initial_attempts,
+        )
+        print(f"Casos retomados: {len(retry_cases)}")
+    else:
+        results = await evaluate_cases(
+            retry_cases,
+            args.start,
+            sleep_seconds,
+            lambda current_results: save_results(
+                output_path, metadata, current_results
+            ),
+            case_numbers=retry_case_numbers,
+        )
+
+    summary = print_summary(results, len(results) if args.resume_from else len(retry_cases))
     save_results(output_path, metadata, results, summary)
-    print(f"\nResultado salvo em: {output_path.relative_to(PROJECT_ROOT)}")
+    if args.resume_from:
+        print(f"Casos que continuam em erro: {summary['failed']}")
+    try:
+        display_path = output_path.relative_to(PROJECT_ROOT)
+    except ValueError:
+        display_path = output_path
+    print(f"\nResultado salvo em: {display_path}")
     return 1 if summary["failed"] else 0
 
 
